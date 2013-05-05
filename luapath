@@ -671,7 +671,7 @@ if [ -n "${SANDBOX}" ]; then
 			exit 1
 		fi
 
-		TMP="${SANDBOX}$(od -An -N8 -tx1 < ${DEVRANDOM} 2>/dev/null | tr -d ' ')"
+		TMP="${SANDBOX}$(od -An -N8 -tx1 < ${DEVRANDOM} 2>/dev/null | tr -d ' 	')"
 
 		if [ ${#TMP} -ne $((${#SANDBOX} + 16)) ]; then
 			printf -- "${0##*/}: ${SANDBOX}: unable to generate random suffix\n" >&2
@@ -680,7 +680,7 @@ if [ -n "${SANDBOX}" ]; then
 
 		SANDBOX="${TMP}"
 
-		trap "rm -f -- ${SANDBOX}/* && rmdir -- ${SANDBOX}" EXIT
+		trap "cd .. && rm -f -- ${SANDBOX}/* && rmdir -- ${SANDBOX}" EXIT
 	fi
 
 	if [ ! -d "${SANDBOX}" ]; then
