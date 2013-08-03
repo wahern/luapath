@@ -13,9 +13,9 @@
 #
 # WARNING: When searching for a Lua interpreter this script may execute
 # various utilities in an attempt to deduce their fitness and release
-# version. The default parameters search for and execute the utilities
-# "lua", "luajit", and "luac". But this script CANNOT GUARANTEE that
-# executing such utilities, or any other utilities, either wittingly or
+# version. By default this script will search for and execute utilities
+# using the glob patterns luac* and lua*. But this script CANNOT GUARANTEE
+# that executing such utilities, or any other utilities, either wittingly or
 # unwittingly, will not result in your COMPUTER EXPLODING. You have been
 # warned.
 #
@@ -437,10 +437,12 @@ usage() {
 	  cppflags     print derived additional CPPFLAGS necessary
 	  ldflags      print derived additional LDFLAGS necessary (TODO)
 	  version      print derived Lua API version
-	  luac [GLOB]  print path to luac utility; GLOB defaults to "luac"
-	  lua [GLOB]   print path to lua interpreter; GLOB defaults to "lua luajit"
-	  evalmacro    run internal macro evaluator
-	  testsym      run internal library symbol tester
+	  luac [GLOB]  print path to luac utility using optional glob pattern
+	               (e.g. "luac5.?"; default is "luac*")
+	  lua [GLOB]   print path to lua interpreter using optional glob pattern
+	               (e.g. "lua luajit"; default is "lua*")
+	  evalmacro    run internal macro evaluator for debugging
+	  testsym      run internal library symbol reader for debugging
 
 	This utility is used to derive compiler flags and filesystem paths
 	necessary to utilize Lua, LuaJIT, and particular versions thereof.
@@ -580,7 +582,7 @@ luac)
 	shift
 
 	if [ $# -eq 0 ]; then
-		set -- luac
+		set -- luac\*
 	fi
 
 	findluac $*
@@ -594,7 +596,7 @@ lua)
 	shift
 
 	if [ $# -eq 0 ]; then
-		set -- lua luajit
+		set -- lua\*
 	fi
 
 	findlua $*
