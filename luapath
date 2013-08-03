@@ -438,9 +438,9 @@ usage() {
 	  cppflags     print derived additional CPPFLAGS necessary
 	  ldflags      print derived additional LDFLAGS necessary (TODO)
 	  version      print derived Lua API version
-	  luac [GLOB]  print path to luac utility using optional glob pattern
+	  luac [GLOB]  print path to luac utility using optional glob patterns
 	               (e.g. "luac5.?"; default is "luac*")
-	  lua [GLOB]   print path to lua interpreter using optional glob pattern
+	  lua [GLOB]   print path to lua interpreter using optional glob patterns
 	               (e.g. "lua luajit"; default is "lua*")
 	  evalmacro    run internal macro evaluator for debugging
 	  testsym      run internal library symbol reader for debugging
