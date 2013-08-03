@@ -23,8 +23,14 @@
 # 
 # Notes:
 #
-# * Originally published 2013-08-02. Derived from an earlier script,
-#   lua.path, written for the cqueues project.
+# * 2013-08-02 - Published. Derived from an earlier script, lua.path,
+#   written for the cqueues project.
+#
+# * 2013-08-05 - Redirect stdin from /dev/null when probing so we don't
+#   	freeze if a utility tries to read from stdin. chdir to a read-only
+# 	directory by default to try to prevent creation of temporary files.
+# 	These features address the issues of LuaTeX reading from stdin and
+# 	creating a luatex.out temporary file by default.
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
@@ -583,7 +589,7 @@ shift $(($OPTIND - 1))
 if [ -n "${SANDBOX}" ]; then
 	if [ "${SANDBOX}" = "${SANDBOX%/}" ]; then
 		if [ ! -c "${DEVRANDOM}" ]; then
-			# FIXME: expand DEVRANDOM into set of different possibilities to check
+			# TODO: expand DEVRANDOM into set of different possibilities to check
 			printf -- "${0##*/}: ${DEVRANDDOM}: no character random device available\n" >&2
 			exit 1
 		fi
@@ -597,7 +603,7 @@ if [ -n "${SANDBOX}" ]; then
 
 		SANDBOX="${TMP}"
 
-		trap "rm -f ${SANDBOX}/* && rmdir ${SANDBOX}" EXIT
+		trap "rm -f -- ${SANDBOX}/* && rmdir -- ${SANDBOX}" EXIT
 	fi
 
 	if [ ! -d "${SANDBOX}" ]; then
@@ -611,12 +617,13 @@ if [ -n "${SANDBOX}" ]; then
 fi
 
 
+if [ -z "${CPPFLAGS:-}" -a -z "${INCDIRS}" ]; then
+	INCDIRS="/usr/include:/usr/local/include"
+fi
+
+
 case "${1:-}" in
 cppflags)
-	if [ -z "${CPPFLAGS:-}" -a -z "${INCDIRS}" ]; then
-		INCDIRS="/usr/include:/usr/local/include"
-	fi
-
 	findversion
 
 	[ "${API_VER:-0}" -gt 0 ] || exit 1
