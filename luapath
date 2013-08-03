@@ -156,7 +156,8 @@ tryluainclude() {
 		if [ "${JIT_REQ}" = "skip" ]; then
 			[ "${J}" -eq 0 ] || return 0
 		elif [ "${JIT_REQ}" = "yes" ]; then
-			[ "$J" -gt "${JIT_VER:-0}" ] || return 0
+			[ "$J" -ge "${JIT_VER:-0}" ] || return 0
+			[ "$J" -gt "${JIT_VER:-0}" -o "${#D}" -lt "${#JIT_DIR}" ] || return 0
 			[ "$J" -ge ${JIT_MIN} ] || return 0
 			[ "$J" -le "${JIT_MAX}" ] || return 0
 
