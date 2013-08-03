@@ -55,7 +55,7 @@ set -f # disable pathname expansion
 export LC_ALL=C # no locale headaches
 unset IFS # no field splitting surprises
 
-MYVERSION=20130802
+MYVERSION=20130803
 MYVENDOR="william@25thandClement.com"
 
 
@@ -301,7 +301,7 @@ findluac() {
 		for F in $(findpath "${1}" no "${PATH}"; findpath "${1}" "${RECURSE}" "${BINDIRS}"); do
 			[ -x "$F" ] && safeperm "$F" || continue
 
-			V="$($F -v 2>/dev/null | head -n1 | sed -ne 's/^Lua \([0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
+			V="$($F -v 2>&1 | head -n1 | sed -ne 's/^Lua \([0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
 			: ${V:=0}
 			V="$((${V%%.*} * 100 + ${V##*.} % 100))"
 
@@ -397,7 +397,7 @@ findlua() {
 			[ "${V}" -ge "${API_MIN}" -a "${V}" -le "${API_MAX}" ] || continue
 
 			if [ -n "${JIT_REQ}" ]; then
-				J="$($F -v 2>/dev/null | head -n1 | sed -ne 's/^LuaJIT \([0123456789][0123456789]*\.[0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
+				J="$($F -v 2>&1 | head -n1 | sed -ne 's/^LuaJIT \([0123456789][0123456789]*\.[0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
 				J="$(jit2num ${J:-0})"
 
 				if [ "${JIT_REQ}" = "skip" ]; then
