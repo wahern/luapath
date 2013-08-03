@@ -203,7 +203,7 @@ findversion() {
 		return 0
 	fi
 
-	# if recurse "all" then recurse into -I directories in CPPFLAGS
+	# recurse into -I directories in CPPFLAGS
 	if [ "${RECURSE}" = "yes" -a "${CPPFLAGS:-}" != "" ]; then
 		set -- ${CPPFLAGS}
 
