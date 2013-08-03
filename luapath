@@ -203,8 +203,8 @@ findversion() {
 	fi
 
 	# if recurse "all" then recurse into -I directories in CPPFLAGS
-	if [ "${RECURSE}" = "yes" ]; then
-		set -- ${CPPFLAGS:-}
+	if [ "${RECURSE}" = "yes" -a "${CPPFLAGS:-}" != "" ]; then
+		set -- ${CPPFLAGS}
 
 		while [ $# -gt 0 ]; do 
 			case "${1}" in
@@ -244,8 +244,10 @@ findversion() {
 		return 0
 	fi
 
+	[ ${#INCDIRS} -gt 0 ] || return 0
+
 	IFS=:
-	set -- ${INCDIRS:-}
+	set -- ${INCDIRS}
 	unset IFS
 
 	PRUNE=
@@ -276,6 +278,8 @@ findpath() {
 		PRUNE="-name . -o -type d -prune -o"
 	fi
 
+	[ ${#WHERE} -gt 0 ] || return 0
+
 	IFS=:
 	set -- ${WHERE}
 	unset IFS
@@ -293,10 +297,6 @@ safeperm() {
 
 
 findluac() {
-	if [ $# -eq 0 ]; then
-		set -- luac
-	fi
-
 	while [ $# -gt 0 ]; do
 		for F in $(findpath "${1}" no "${PATH}"; findpath "${1}" "${RECURSE}" "${BINDIRS}"); do
 			[ -x "$F" ] && safeperm "$F" || continue
@@ -378,10 +378,6 @@ jit2num() {
 
 
 findlua() {
-	if [ $# -eq 0 ]; then
-		set -- lua luajit
-	fi
-
 	while [ $# -gt 0 ]; do
 		for F in $(findpath "${1}" no "${PATH}"; findpath "${1}" "${RECURSE}" "${BINDIRS}"); do
 			[ -x "$F" ] && safeperm "$F" || continue
@@ -583,6 +579,10 @@ version)
 luac)
 	shift
 
+	if [ $# -eq 0 ]; then
+		set -- luac
+	fi
+
 	findluac $*
 
 	[ -n "${LUAC_PATH}" ] || exit 1
@@ -592,6 +592,10 @@ luac)
 	;;
 lua)
 	shift
+
+	if [ $# -eq 0 ]; then
+		set -- lua luajit
+	fi
 
 	findlua $*
 
