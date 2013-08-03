@@ -8,8 +8,10 @@
 #
 # This script attempts to adhere strictly to POSIX shell specifications. The
 # known non-POSIX features used are the path of the shell at the very first
-# line of this script, and the default compiler command name of `cc' instead
-# of `c99'. For any other issues please contact the author.
+# line of this script, the default compiler command name of `cc' instead of
+# `c99', and the use of /dev/urandom for generating a random sandbox
+# directory suffix. All of these can be override. For any other issues
+# please contact the author.
 #
 # WARNING: When searching for a Lua interpreter this script may execute
 # various utilities in an attempt to deduce their fitness and release
@@ -21,16 +23,22 @@
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # 
-# Notes:
+# Changelog:
 #
 # * 2013-08-02 - Published. Derived from an earlier script, lua.path,
 #   written for the cqueues project.
 #
 # * 2013-08-05 - Redirect stdin from /dev/null when probing so we don't
-#   	freeze if a utility tries to read from stdin. chdir to a read-only
-# 	directory by default to try to prevent creation of temporary files.
-# 	These features address the issues of LuaTeX reading from stdin and
-# 	creating a luatex.out temporary file by default.
+#   	freeze if a utility tries to read from stdin.
+#
+# 	chdir to a read-only directory by default to try to prevent creation
+# 	of temporary files. These features address the issues of LuaTeX
+# 	reading from stdin and creating a luatex.out file in the current
+# 	working directory. By default a directory with a random suffix
+# 	generated from /dev/urandom is placed in TMPDIR and removed on exit.
+#
+# 	If CPPFLAGS is empty and no -I options directly specified then set
+# 	INCDIRS to "/usr/include:/usr/local/include".
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
