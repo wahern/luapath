@@ -424,7 +424,7 @@ usage() {
 	  -L PATH      additional search directory for libraries
 	  -P PATH      additional search directory for binaries
 	  -r           recursively search directories
-	  -m MAXDEPTH  limit recursion to MAXDEPTH (only for GNU find)
+	  -m MAXDEPTH  limit recursion to MAXDEPTH (only for GNU and BSD find)
 	  -x           do not cross device mounts when recursing
 	  -s           find shortest pathname, otherwise print first best match
 	  -v VERSION   require specific Lua version or range
