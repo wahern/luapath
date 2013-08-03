@@ -55,10 +55,14 @@ set -C # noclobber
 \unalias -a # no command surprises
 export LC_ALL=C # no locale headaches
 unset IFS # no field splitting surprises
+: ${TMPDIR:=/tmp} # sane TMPDIR
 
 MYVERSION=20130805
 MYVENDOR="william@25thandClement.com"
 
+
+DEVRANDOM=/dev/urandom
+SANDBOX="${TMPDIR}/${0##*/}-"
 
 INCDIRS=
 LIBDIRS=
@@ -420,10 +424,15 @@ findlua() {
 
 usage() {
 	cat <<-EOF
-	usage: ${0##*/} [-I:L:P:rm:xsv:j:JVh] cppflags|ldflags|version|lua|luac
+	usage: ${0##*/} [-I:L:P:d:Drm:xsv:j:JVh] cppflags|ldflags|version|lua|luac
 	  -I PATH      additional search directory for includes
 	  -L PATH      additional search directory for libraries
 	  -P PATH      additional search directory for binaries
+	  -d PATH      use PATH as sandbox directory; a random 16 byte suffix is
+	               generated from /dev/urandom and the directory removed on exit
+	               unless a trailing "/" is present
+	               (default sandbox is $TMPDIR/${0##*/}-XXXXXXXXXXXXXXXX)
+	  -D           do not create a sandbox
 	  -r           recursively search directories
 	  -m MAXDEPTH  limit recursion to MAXDEPTH (only for GNU and BSD find)
 	  -x           do not cross device mounts when recursing
@@ -467,6 +476,9 @@ usage() {
 	directories specified in CPPFLAGS, LDFLAGS, and PATH are also
 	recursed.
 
+	If no directories are specified in CPPFLAGS or with the -I switch,
+	then /usr/include and /usr/local/include are used.
+
 	Report bugs to <william@25thandClement.com>
 	EOF
 }
@@ -481,7 +493,7 @@ version() {
 }
 
 
-while getopts I:L:P:rm:xsv:j:JVh OPT; do
+while getopts I:L:P:d:Drm:xsv:j:JVh OPT; do
 	case "${OPT}" in
 	I)
 		INCDIRS="${INCDIRS:-}${INCDIRS:+:}${OPTARG}"
@@ -491,6 +503,12 @@ while getopts I:L:P:rm:xsv:j:JVh OPT; do
 		;;
 	P)
 		BINDIRS="${BINDIRS:-}${BINDIRS:+:}${OPTARG}"
+		;;
+	d)
+		SANDBOX="${OPTARG}"
+		;;
+	D)
+		SANDBOX=
 		;;
 	r)
 		RECURSE=yes
@@ -562,8 +580,43 @@ done
 shift $(($OPTIND - 1))
 
 
+if [ -n "${SANDBOX}" ]; then
+	if [ "${SANDBOX}" = "${SANDBOX%/}" ]; then
+		if [ ! -c "${DEVRANDOM}" ]; then
+			# FIXME: expand DEVRANDOM into set of different possibilities to check
+			printf -- "${0##*/}: ${DEVRANDDOM}: no character random device available\n" >&2
+			exit 1
+		fi
+
+		TMP="${SANDBOX}$(od -An -N8 -tx1 < ${DEVRANDOM} 2>/dev/null | tr -d ' ')"
+
+		if [ ${#TMP} -ne $((${#SANDBOX} + 16)) ]; then
+			printf -- "${0##*/}: ${SANDBOX}: unable to generate random suffix\n" >&2
+			exit 1
+		fi
+
+		SANDBOX="${TMP}"
+
+		trap "rm -f ${SANDBOX}/* && rmdir ${SANDBOX}" EXIT
+	fi
+
+	if [ ! -d "${SANDBOX}" ]; then
+		OMASK="$(umask)"
+		umask 0777
+		mkdir -m0550 -- "${SANDBOX}" || exit 1
+		umask ${OMASK}
+	fi
+
+	cd ${SANDBOX}
+fi
+
+
 case "${1:-}" in
 cppflags)
+	if [ -z "${CPPFLAGS:-}" -a -z "${INCDIRS}" ]; then
+		INCDIRS="/usr/include:/usr/local/include"
+	fi
+
 	findversion
 
 	[ "${API_VER:-0}" -gt 0 ] || exit 1
@@ -579,6 +632,7 @@ version)
 	[ "${API_VER:-0}" -gt 0 ] || exit 1
 
 	printf "$(((${API_VER} / 100) % 100)).$((($API_VER) % 100))\n"
+
 	;;
 luac)
 	shift
