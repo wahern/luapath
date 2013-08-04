@@ -263,7 +263,7 @@ findversion() {
 
 
 	# iterate through CPPFLAGS to probe different precedence
-	if [ "${API_VER:-0}" -eq 0 ]; then
+	if [ "${API_VER:-0}" -lt "${API_MAX}" ]; then
 		IFS=:
 		set -- ${CPPDIRS}
 		unset IFS
@@ -280,9 +280,10 @@ findversion() {
 
 	if [ -n "${PKGCONFIG}" ]; then
 		PKGFLAGS="$(${PKGCONFIG} --list-all </dev/null 2>/dev/null | sed -ne 's/^\(lua[[:graph:]]*\).*/\1/p' | xargs -- ${PKGCONFIG} --cflags 2>/dev/null)"
+		PKGDIRS="$(idirs "${PKGFLAGS}")"
 
 		IFS=:
-		set -- $(idirs "${PKGFLAGS}")
+		set -- ${PKGDIRS}
 		unset IFS
 
 		for D; do
