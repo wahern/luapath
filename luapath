@@ -445,7 +445,7 @@ usage() {
 	  -d PATH      use PATH as sandbox directory; a random 16 byte suffix is
 	               generated from /dev/urandom and the directory removed on exit
 	               unless a trailing "/" is present
-	               (default sandbox is $TMPDIR/${0##*/}-XXXXXXXXXXXXXXXX)
+	               (default sandbox is \$TMPDIR/${0##*/}-XXXXXXXXXXXXXXXX)
 	  -D           do not create a sandbox
 	  -r           recursively search directories
 	  -m MAXDEPTH  limit recursion to MAXDEPTH (only for GNU and BSD find)
