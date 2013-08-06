@@ -490,8 +490,9 @@ usage() {
 	directories specified in CPPFLAGS, LDFLAGS, and PATH are also
 	recursed.
 
-	If no directories are specified in CPPFLAGS or with the -I switch,
-	then /usr/include and /usr/local/include are used.
+	If the environment variable CPPFLAGS is empty and no -I options are
+	specified directly, then /usr/include and /usr/local/include are
+	used when probing for cppflags and API version.
 
 	Report bugs to <william@25thandClement.com>
 	EOF
