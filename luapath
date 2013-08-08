@@ -40,6 +40,9 @@
 # 	If CPPFLAGS is empty and no -I options directly specified then set
 # 	INCDIRS to "/usr/include:/usr/local/include".
 #
+# * 2013-08-07 - Add pkg-config support and refactor header probing to delay
+# 	recursive searching.
+#
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 # Copyright (C) 2012-2013 William Ahern
@@ -71,7 +74,7 @@ export LC_ALL=C # no locale headaches
 unset IFS # no field splitting surprises
 : ${TMPDIR:=/tmp} # sane TMPDIR
 
-MYVERSION=20130805
+MYVERSION=20130807
 MYVENDOR="william@25thandClement.com"
 
 
@@ -85,6 +88,7 @@ RECURSE=no
 MAXDEPTH=   # full command switch, like "-maxdepth 3", if supported
 XDEV=       # do not cross device boundaries; i.e. "-xdev"
 SHORTEST=   # continue searching until shortest pathname found
+PKGCONFIG=  # path to pkg-config, found by `command -v` when -k option invoked
 
 API_MIN=500
 API_MAX=999
@@ -222,6 +226,52 @@ findversion() {
 		return 0
 	fi
 
+
+	if [ -n "${PKGCONFIG}" ]; then
+		set -- "$(${PKGCONFIG} --list-all </dev/null 2>/dev/null | sed -ne 's/^\(lua[[:graph:]]*\).*/\1/p' | xargs -- ${PKGCONFIG} --cflags 2>/dev/null)"
+
+		while [ $# -gt 0 ]; do
+			case "${1}" in
+			-I)
+				shift
+
+				if [ -n "${1:-}" ]; then
+					tryluainclude "${1}/lua.h"
+
+					if foundversion; then
+						return 0
+					fi
+				fi
+				;;
+			-I*)
+				if [ "${1}" != "-I" ]; then
+					tryluainclude "${1#-I}/lua.h"
+
+					if foundversion; then
+						return 0
+					fi
+				fi
+				;;
+			esac
+
+			shift
+		done
+	fi
+
+
+	IFS=:
+	set -- ${INCDIRS}
+	unset IFS
+
+	for D; do
+		tryluainclude "${D}/lua.h"
+
+		if foundversion; then
+			return 0
+		fi
+	done
+
+
 	# recurse into -I directories in CPPFLAGS
 	if [ "${RECURSE}" = "yes" -a "${CPPFLAGS:-}" != "" ]; then
 		set -- ${CPPFLAGS}
@@ -243,7 +293,7 @@ findversion() {
 
 				;;
 			-I*)
-				if [ -n "${1:-}" -a "${1:-}" != "-I" ]; then
+				if [ "${1}" != "-I" ]; then
 					for F in $(find ${1#-I} ${MAXDEPTH} ${XDEV} -name lua.h -print 2>/dev/null); do
 						tryluainclude "${F}"
 
@@ -264,20 +314,16 @@ findversion() {
 		return 0
 	fi
 
-	[ ${#INCDIRS} -gt 0 ] || return 0
+
+	# recurse into INCDIRS
+	[ ${#INCDIRS} -gt 0 -a "${RECURSE}" = "yes" ] || return 0
 
 	IFS=:
 	set -- ${INCDIRS}
 	unset IFS
 
-	PRUNE=
-
-	if [ "${RECURSE}" = "no" ]; then
-		PRUNE="-name . -o -type d -prune -o"
-	fi
-
 	for D; do
-		for F in $(find ${D}/. ${MAXDEPTH} ${XDEV} ${PRUNE} -name lua.h -print 2>/dev/null); do
+		for F in $(find ${D}/. ${MAXDEPTH} ${XDEV} -name lua.h -print 2>/dev/null); do
 			tryluainclude "${F}"
 
 			if foundversion; then
@@ -438,7 +484,7 @@ findlua() {
 
 usage() {
 	cat <<-EOF
-	usage: ${0##*/} [-I:L:P:d:Drm:xsv:j:JVh] cppflags|ldflags|version|lua|luac
+	usage: ${0##*/} [-I:L:P:d:Dkrm:xsv:j:JVh] cppflags|ldflags|version|lua|luac
 	  -I PATH      additional search directory for includes
 	  -L PATH      additional search directory for libraries
 	  -P PATH      additional search directory for binaries
@@ -447,6 +493,7 @@ usage() {
 	               unless a trailing "/" is present
 	               (default sandbox is \$TMPDIR/${0##*/}-XXXXXXXXXXXXXXXX)
 	  -D           do not create a sandbox
+	  -k           query pkg-config if available
 	  -r           recursively search directories
 	  -m MAXDEPTH  limit recursion to MAXDEPTH (only for GNU and BSD find)
 	  -x           do not cross device mounts when recursing
@@ -508,7 +555,7 @@ version() {
 }
 
 
-while getopts I:L:P:d:Drm:xsv:j:JVh OPT; do
+while getopts I:L:P:d:Dkrm:xsv:j:JVh OPT; do
 	case "${OPT}" in
 	I)
 		INCDIRS="${INCDIRS:-}${INCDIRS:+:}${OPTARG}"
@@ -524,6 +571,9 @@ while getopts I:L:P:d:Drm:xsv:j:JVh OPT; do
 		;;
 	D)
 		SANDBOX=
+		;;
+	k)
+		PKGCONFIG="$(command -v pkg-config || true)"
 		;;
 	r)
 		RECURSE=yes
