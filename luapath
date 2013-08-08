@@ -82,6 +82,7 @@ MYVENDOR="william@25thandClement.com"
 DEVRANDOM=/dev/urandom
 SANDBOX="${TMPDIR}/${0##*/}-"
 
+CPPDIRS=    # -I directories from CPPFLAGS
 INCDIRS=
 LIBDIRS=
 BINDIRS=
@@ -107,6 +108,39 @@ LUAC_VER=
 
 LUA_PATH=
 LUA_VER=
+
+
+#
+# parse CPPFLAGS -I directories
+#
+idirs() {
+	DIRS=
+
+	set -- ${1:-}
+
+	while [ $# -gt 0 ]; do 
+		case "${1}" in
+		-I)
+			shift
+
+			if [ -n "${1:-}" ]; then
+				DIRS="${DIRS}${DIRS:+:}${1}"
+			fi
+
+			;;
+		-I*)
+			if [ "${1}" != "-I" ]; then
+				DIRS="${DIRS}${DIRS:+:}${1#-I}"
+			fi
+
+			;;
+		esac
+
+		shift
+	done
+
+	printf -- "${DIRS}"
+}
 
 
 #
@@ -228,34 +262,35 @@ findversion() {
 	fi
 
 
+	# iterate through CPPFLAGS to probe different precedence
+	if [ "${API_VER:-0}" -eq 0 ]; then
+		IFS=:
+		set -- ${CPPDIRS}
+		unset IFS
+
+		for D; do
+			tryluainclude "${D}/lua.h"
+
+			if foundversion; then
+				return 0
+			fi
+		done
+	fi
+
+
 	if [ -n "${PKGCONFIG}" ]; then
-		set -- "$(${PKGCONFIG} --list-all </dev/null 2>/dev/null | sed -ne 's/^\(lua[[:graph:]]*\).*/\1/p' | xargs -- ${PKGCONFIG} --cflags 2>/dev/null)"
+		PKGFLAGS="$(${PKGCONFIG} --list-all </dev/null 2>/dev/null | sed -ne 's/^\(lua[[:graph:]]*\).*/\1/p' | xargs -- ${PKGCONFIG} --cflags 2>/dev/null)"
 
-		while [ $# -gt 0 ]; do
-			case "${1}" in
-			-I)
-				shift
+		IFS=:
+		set -- $(idirs "${PKGFLAGS}")
+		unset IFS
 
-				if [ -n "${1:-}" ]; then
-					tryluainclude "${1}/lua.h"
+		for D; do
+			tryluainclude "${D}/lua.h"
 
-					if foundversion; then
-						return 0
-					fi
-				fi
-				;;
-			-I*)
-				if [ "${1}" != "-I" ]; then
-					tryluainclude "${1#-I}/lua.h"
-
-					if foundversion; then
-						return 0
-					fi
-				fi
-				;;
-			esac
-
-			shift
+			if foundversion; then
+				return 0
+			fi
 		done
 	fi
 
@@ -273,47 +308,23 @@ findversion() {
 	done
 
 
-	# recurse into -I directories in CPPFLAGS
-	if [ "${RECURSE}" = "yes" -a "${CPPFLAGS:-}" != "" ]; then
-		set -- ${CPPFLAGS}
+	[ "${RECURSE}" = "yes" ] || return 0
 
-		while [ $# -gt 0 ]; do 
-			case "${1}" in
-			-I)
-				shift
 
-				if [ -n "${1:-}" ]; then
-					for F in $(find ${1} ${MAXDEPTH} ${XDEV} -name lua.h -print 2>/dev/null); do
-						tryluainclude "${F}"
+	# recurse into CPPDIRS
+	IFS=:
+	set -- ${CPPDIRS}
+	unset IFS
 
-						if foundversion; then
-							return 0
-						fi
-					done
-				fi
+	for D; do
+		for F in $(find ${D} ${MAXDEPTH} ${XDEV} -name lua.h -print 2>/dev/null); do
+			tryluainclude "${F}"
 
-				;;
-			-I*)
-				if [ "${1}" != "-I" ]; then
-					for F in $(find ${1#-I} ${MAXDEPTH} ${XDEV} -name lua.h -print 2>/dev/null); do
-						tryluainclude "${F}"
-
-						if foundversion; then
-							return 0
-						fi
-					done
-				fi
-
-				;;
-			esac
-
-			shift
+			if foundversion; then
+				return 0
+			fi
 		done
-	fi
-
-	if foundversion; then
-		return 0
-	fi
+	done
 
 
 	# recurse into INCDIRS
@@ -684,7 +695,9 @@ if [ -n "${SANDBOX}" ]; then
 fi
 
 
-if [ -z "${CPPFLAGS:-}" -a -z "${INCDIRS}" ]; then
+CPPDIRS="$(idirs "${CPPFLAGS:-}")"
+
+if [ -z "${CPPDIRS}" -a -z "${INCDIRS}" ]; then
 	INCDIRS="/usr/include:/usr/local/include"
 fi
 
