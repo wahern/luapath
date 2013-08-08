@@ -73,6 +73,7 @@ set -C # noclobber
 export LC_ALL=C # no locale headaches
 unset IFS # no field splitting surprises
 : ${TMPDIR:=/tmp} # sane TMPDIR
+: ${CC:=cc}
 
 MYVERSION=20130807
 MYVENDOR="william@25thandClement.com"
@@ -643,6 +644,13 @@ while getopts I:L:P:d:Dkrm:xsv:j:JVh OPT; do
 done
 
 shift $(($OPTIND - 1))
+
+
+for U in ${CC:-cc} find grep od rm rmdir sed xargs; do
+	if ! command -v ${U} >/dev/null 2>&1; then
+		printf -- "${0##*/}: ${U}: command not found\n" >&2
+	fi
+done
 
 
 if [ -n "${SANDBOX}" ]; then
