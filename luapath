@@ -191,7 +191,7 @@ tryluainclude() {
 	if [ "${1%/*}" != "${1}" ]; then
 		D="${1%/*}"
 
-		# cleanup aftering Solaris directory prune trick
+		# cleanup after Solaris directory prune trick
 		if [ "${D##*/./}" != "${D}" ]; then
 			D="${D%%/./*}/${D##*/./}"
 		else
