@@ -75,7 +75,7 @@ unset IFS # no field splitting surprises
 : ${TMPDIR:=/tmp} # sane TMPDIR
 : ${CC:=cc}
 
-MYVERSION=20130821
+MYVERSION=20130830
 MYVENDOR="william@25thandClement.com"
 
 
@@ -279,7 +279,7 @@ findversion() {
 
 
 	if [ -n "${PKGCONFIG}" ]; then
-		PKGFLAGS="$(${PKGCONFIG} --list-all </dev/null 2>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p' | xargs -- ${PKGCONFIG} --cflags 2>/dev/null)"
+		PKGFLAGS="$(${PKGCONFIG} --list-all </dev/null 2>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p' | xargs -- ${PKGCONFIG} --cflags 2>/dev/null | cat)"
 		PKGDIRS="$(idirs "${PKGFLAGS}")"
 
 		IFS=:
