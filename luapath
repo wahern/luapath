@@ -43,6 +43,11 @@
 # * 2013-08-07 - Add pkg-config support and refactor header probing to delay
 # 	recursive searching.
 #
+# * 2013-09-09 - NetBSD's sh gets upset over the noclobber option and
+# 	redirection to /dev/null, so use append operator. And check $#
+# 	before iterating over a null parameter set with `do X; ...  done`
+# 	when `set -u` is enabled--it complains about $@ being unset.
+#
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 # Copyright (C) 2012-2013 William Ahern
@@ -75,7 +80,7 @@ unset IFS # no field splitting surprises
 : ${TMPDIR:=/tmp} # sane TMPDIR
 : ${CC:=cc}
 
-MYVERSION=20130830
+MYVERSION=20130909
 MYVENDOR="william@25thandClement.com"
 
 
@@ -153,7 +158,7 @@ idirs() {
 #
 evalmacro() {
 	printf "#include <$1>\n[===[$2]===]\n" \
-	| ${CC:-cc} ${CPPFLAGS:-} -E - 2>/dev/null \
+	| ${CC:-cc} ${CPPFLAGS:-} -E - 2>>/dev/null \
 	| sed -ne "
 		s/^.*\\[===\\[ *\\(${3:-.*}\\) *\\]===\\].*$/${4:-\\1}/
 		t Found
@@ -178,7 +183,7 @@ testsym() {
 	# global symbols. Solaris and OS X have additional symbol types
 	# beyond the canonical POSIX/BSD types, all of which are uppercase
 	# and within [A-T].
-	(nm -Pg ${1} 2>/dev/null || nm -g 2>/dev/null) \
+	(nm -Pg ${1} 2>>/dev/null || nm -g 2>>/dev/null) \
 	| sed -ne '/ [A-T] /p' \
 	| grep -qE "${2}"
 }
@@ -268,31 +273,35 @@ findversion() {
 		set -- ${CPPDIRS}
 		unset IFS
 
-		for D; do
-			tryluainclude "${D}/lua.h"
+		if [ $# -gt 0 ]; then
+			for D; do
+				tryluainclude "${D}/lua.h"
 
-			if foundversion; then
-				return 0
-			fi
-		done
+				if foundversion; then
+					return 0
+				fi
+			done
+		fi
 	fi
 
 
 	if [ -n "${PKGCONFIG}" ]; then
-		PKGFLAGS="$(${PKGCONFIG} --list-all </dev/null 2>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p' | xargs -- ${PKGCONFIG} --cflags 2>/dev/null | cat)"
+		PKGFLAGS="$(${PKGCONFIG} --list-all </dev/null 2>>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p' | xargs -- ${PKGCONFIG} --cflags 2>>/dev/null | cat)"
 		PKGDIRS="$(idirs "${PKGFLAGS}")"
 
 		IFS=:
 		set -- ${PKGDIRS}
 		unset IFS
 
-		for D; do
-			tryluainclude "${D}/lua.h"
+		if [ $# -gt 0 ]; then
+			for D; do
+				tryluainclude "${D}/lua.h"
 
-			if foundversion; then
-				return 0
-			fi
-		done
+				if foundversion; then
+					return 0
+				fi
+			done
+		fi
 	fi
 
 
@@ -300,13 +309,15 @@ findversion() {
 	set -- ${INCDIRS}
 	unset IFS
 
-	for D; do
-		tryluainclude "${D}/lua.h"
+	if [ $# -gt 0 ]; then
+		for D; do
+			tryluainclude "${D}/lua.h"
 
-		if foundversion; then
-			return 0
-		fi
-	done
+			if foundversion; then
+				return 0
+			fi
+		done
+	fi
 
 
 	[ "${RECURSE}" = "yes" ] || return 0
@@ -317,15 +328,17 @@ findversion() {
 	set -- ${CPPDIRS}
 	unset IFS
 
-	for D; do
-		for F in $(find ${D} ${MAXDEPTH} ${XDEV} -name lua.h -print 2>/dev/null); do
-			tryluainclude "${F}"
+	if [ $# -gt 0 ]; then
+		for D; do
+			for F in $(find ${D} ${MAXDEPTH} ${XDEV} -name lua.h -print 2>>/dev/null); do
+				tryluainclude "${F}"
 
-			if foundversion; then
-				return 0
-			fi
+				if foundversion; then
+					return 0
+				fi
+			done
 		done
-	done
+	fi
 
 
 	# recurse into INCDIRS
@@ -333,15 +346,17 @@ findversion() {
 	set -- ${INCDIRS}
 	unset IFS
 
-	for D; do
-		for F in $(find ${D}/. ${MAXDEPTH} ${XDEV} -name lua.h -print 2>/dev/null); do
-			tryluainclude "${F}"
+	if [ $# -gt 0 ]; then
+		for D; do
+			for F in $(find ${D}/. ${MAXDEPTH} ${XDEV} -name lua.h -print 2>>/dev/null); do
+				tryluainclude "${F}"
 
-			if foundversion; then
-				return 0
-			fi
+				if foundversion; then
+					return 0
+				fi
+			done
 		done
-	done
+	fi
 }
 
 
@@ -361,9 +376,11 @@ findpath() {
 	set -- ${WHERE}
 	unset IFS
 
-	for D; do
-		find "${D}/." ${MAXDEPTH} ${XDEV} ${PRUNE} -name "${NAME}" -print 2>/dev/null | sed -e 's/\/\.//'
-	done
+	if [ $# -gt 0 ]; then
+		for D; do
+			find "${D}/." ${MAXDEPTH} ${XDEV} ${PRUNE} -name "${NAME}" -print 2>>/dev/null | sed -e 's/\/\.//'
+		done
+	fi
 }
 
 
@@ -388,7 +405,7 @@ findluac() {
 
 			[ "${V}" -ge "${API_MIN}" -a "${V}" -le "${API_MAX}" ] || continue
 
-			printf "return true" | ${F} -p - </dev/null >/dev/null 2>&1 || continue
+			printf "return true" | ${F} -p - </dev/null >>/dev/null 2>&1 || continue
 
 			LUAC_PATH="$F"
 			LUAC_VER="$V"
@@ -459,7 +476,7 @@ findlua() {
 		for F in $(findpath "${1}" no "${PATH}"; findpath "${1}" "${RECURSE}" "${BINDIRS}"); do
 			[ -x "$F" ] && safeperm "$F" || continue
 
-			V="$($F -e 'print(string.match(_VERSION, [[[%d.]+]]))' </dev/null 2>/dev/null | head -n1 | sed -ne 's/^\([0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
+			V="$($F -e 'print(string.match(_VERSION, [[[%d.]+]]))' </dev/null 2>>/dev/null | head -n1 | sed -ne 's/^\([0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
 			: ${V:=0}
 			V="$((${V%%.*} * 100 + ${V##*.} % 100))"
 
@@ -595,7 +612,7 @@ while getopts I:L:P:d:Dkrm:xsv:j:JVh OPT; do
 			exit 1
 		fi
 
-		if find "${TMPDIR:-/tmp}" -maxdepth ${OPTARG} -prune >/dev/null 2>&1; then
+		if find "${TMPDIR:-/tmp}" -maxdepth ${OPTARG} -prune >>/dev/null 2>&1; then
 			MAXDEPTH="-maxdepth ${OPTARG}"
 		else
 			printf -- "${0##*/}: $(command -v find): -maxdepth unsupported\n" >&2
@@ -657,7 +674,7 @@ shift $(($OPTIND - 1))
 
 
 for U in ${CC:-cc} find grep od rm rmdir sed xargs; do
-	if ! command -v ${U} >/dev/null 2>&1; then
+	if ! command -v ${U} >>/dev/null 2>&1; then
 		printf -- "${0##*/}: ${U}: command not found\n" >&2
 	fi
 done
@@ -671,7 +688,7 @@ if [ -n "${SANDBOX}" ]; then
 			exit 1
 		fi
 
-		TMP="${SANDBOX}$(od -An -N8 -tx1 < ${DEVRANDOM} 2>/dev/null | tr -d ' 	')"
+		TMP="${SANDBOX}$(od -An -N8 -tx1 < ${DEVRANDOM} 2>>/dev/null | tr -d ' 	')"
 
 		if [ ${#TMP} -ne $((${#SANDBOX} + 16)) ]; then
 			printf -- "${0##*/}: ${SANDBOX}: unable to generate random suffix\n" >&2
