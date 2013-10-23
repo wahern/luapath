@@ -489,13 +489,14 @@ findlib() {
 	if [ -n "${PKGCONFIG}" ]; then
 		PKGFLAGS="$(${PKGCONFIG} --list-all </dev/null 2>>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p' | xargs -- ${PKGCONFIG} --libs 2>>/dev/null | cat)"
 		PKGDIRS="$(ldirs "${PKGFLAGS}")"
-		PKGDIRS="${PKGDIRS}${PKGDIRS:+:}/usr/lib:/usr/local/lib"
+		PKGDIRS="${PKGDIRS}${PKGDIRS:+:}/lib:/usr/lib:/usr/local/lib"
 		NUMDIRS="$(ndirs "${PKGDIRS}")"
 		PKGLIBS="$(xdirs "l" "${PKGFLAGS}")"
 		NUMLIBS="$(ndirs "${PKGLIBS}")"
+		ALLDIRS="${PKGDIRS}:${PKGLIBS}"
 
 		IFS=:
-		set -- ${PKGDIRS}:${PKGLIBS}
+		set -- ${ALLDIRS}
 		unset IFS
 
 		I=1
@@ -507,7 +508,10 @@ findlib() {
 
 				for X in so a dylib; do
 					#printf -- "I=$I K=$K $findlib_L/lib$findlib_l.$X\n"
-					trylib "$findlib_L/lib$findlib_l.$X"
+
+					for Y in $(findpath "lib${findlib_l}*.$X*" yes "${findlib_L}"); do
+						trylib "${Y}"
+					done
 
 					if foundlib; then
 						return 0
@@ -539,8 +543,8 @@ findpath() {
 	unset IFS
 
 	if [ $# -gt 0 ]; then
-		for D; do
-			find "${D}/." ${MAXDEPTH} ${XDEV} ${PRUNE} -name "${NAME}" -print 2>>/dev/null | sed -e 's/\/\.//'
+		for findpath_D; do
+			find "${findpath_D}/." ${MAXDEPTH} ${XDEV} ${PRUNE} -name "${NAME}" -print 2>>/dev/null | sed -e 's/\/\.//'
 		done
 	fi
 }
@@ -883,7 +887,7 @@ fi
 LDDIRS="$(ldirs "${LDFLAGS:-}")"
 
 if [ -z "${LDDIRS}" -a -z "${LIBDIRS}" ]; then
-	LIBDIRS="/usr/lib:/usr/local/lib"
+	LIBDIRS="/lib:/usr/lib:/usr/local/lib"
 fi
 
 
