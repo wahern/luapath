@@ -508,19 +508,39 @@ findlib() {
 
 				#printf -- "I=$I K=$K $findlib_L/lib$findlib_l*.*\n"
 
-				for Y in $(findpath "lib${findlib_l}*.*" yes "${findlib_L}"); do
-					trylib "${Y}"
-				done
+				for findlib_R in no ${RECURSE}; do
+					for findlib_lib in $(findpath "lib${findlib_l}*.*" ${findlib_R} "${findlib_L}"); do
+						trylib "${findlib_lib}"
+					done
 
-				if foundlib; then
-					return 0
-				fi
+					if foundlib; then
+						return 0
+					fi
+				done
 
 				K=$(($K + 1))
 			done
 			I=$(($I + 1))
 		done
 	fi
+
+	ALLDIRS="${LDDIRS}${LDDIRS:+:}${LIBDIRS}"
+
+	IFS=:
+	set -- ${ALLDIRS}
+	unset IFS
+
+	for findlib_D; do
+		for findlib_R in no ${RECURSE}; do
+			for findlib_lib in $(findpath "liblua*.*" ${findlib_R} "${findlib_D}"); do
+				trylib "${findlib_lib}"
+			done
+
+			if foundlib; then
+				return 0
+			fi
+		done
+	done
 }
 
 
