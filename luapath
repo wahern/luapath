@@ -493,7 +493,7 @@ findlib() {
 		NUMDIRS="$(ndirs "${PKGDIRS}")"
 		PKGLIBS="$(xdirs "l" "${PKGFLAGS}")"
 		NUMLIBS="$(ndirs "${PKGLIBS}")"
-		ALLDIRS="${PKGDIRS}:${PKGLIBS}"
+		ALLDIRS="${PKGDIRS}${PKGLIBS:+:}${PKGLIBS}"
 
 		IFS=:
 		set -- ${ALLDIRS}
