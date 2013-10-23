@@ -506,17 +506,15 @@ findlib() {
 				findlib_L=$(eval "printf \${$I}")
 				findlib_l=$(eval "printf \${$K}")
 
-				for X in so a dylib; do
-					#printf -- "I=$I K=$K $findlib_L/lib$findlib_l.$X\n"
+				#printf -- "I=$I K=$K $findlib_L/lib$findlib_l*.*\n"
 
-					for Y in $(findpath "lib${findlib_l}*.$X*" yes "${findlib_L}"); do
-						trylib "${Y}"
-					done
-
-					if foundlib; then
-						return 0
-					fi
+				for Y in $(findpath "lib${findlib_l}*.*" yes "${findlib_L}"); do
+					trylib "${Y}"
 				done
+
+				if foundlib; then
+					return 0
+				fi
 
 				K=$(($K + 1))
 			done
