@@ -82,7 +82,7 @@ unset IFS # no field splitting surprises
 : ${TMPDIR:=/tmp} # sane TMPDIR
 : ${CC:=cc}
 
-MYVERSION=20131022
+MYVERSION=20131025
 MYVENDOR="william@25thandClement.com"
 
 
@@ -589,7 +589,7 @@ findluac() {
 
 			[ "${V}" -ge "${API_MIN}" -a "${V}" -le "${API_MAX}" ] || continue
 
-			printf "return true" | ${F} -p - </dev/null >>/dev/null 2>&1 || continue
+			printf "return true" 2>>/dev/null | ${F} -p - </dev/null >>/dev/null 2>&1 || continue
 
 			LUAC_PATH="$F"
 			LUAC_VER="$V"
