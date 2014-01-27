@@ -50,6 +50,8 @@
 #
 # * 2013-10-22 - Initial ldflags detection.
 #
+# * 2014-01-26 - Migrate CC vendor detection from external script.
+#
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 # Copyright (C) 2012-2013 William Ahern
@@ -82,7 +84,7 @@ unset IFS # no field splitting surprises
 : ${TMPDIR:=/tmp} # sane TMPDIR
 : ${CC:=cc}
 
-MYVERSION=20131025
+MYVERSION=20140126
 MYVENDOR="william@25thandClement.com"
 
 
@@ -694,6 +696,21 @@ findlua() {
 }
 
 
+ccname() {
+	${CC} -E - <<-EOF | awk '/sunpro/||/clang/||/gcc/||/other/{ print $1; exit; }'
+		#if defined __SUNPRO_C
+		sunpro
+		#elif defined __clang__
+		clang
+		#elif defined __GNUC__
+		gcc
+		#else
+		other
+		#endif
+	EOF
+}
+
+
 usage() {
 	cat <<-EOF
 	usage: ${0##*/} [-I:L:P:d:Dkrm:xsv:j:JVh] cppflags|ldflags|version|lua|luac
@@ -725,6 +742,7 @@ usage() {
 	               (e.g. "luac5.?"; default is "luac*")
 	  lua [GLOB]   print path to lua interpreter using optional glob patterns
 	               (e.g. "lua luajit"; default is "lua*")
+	  ccname       print CC name (e.g. sunpro, clang, gcc)
 	  evalmacro    run internal macro evaluator for debugging
 	  testsym      run internal library symbol reader for debugging
 
@@ -968,6 +986,10 @@ lua)
 	[ -n "${LUA_PATH}" ] || exit 1
 	
 	printf -- "${LUA_PATH}\n"
+
+	;;
+ccname)
+	ccname
 
 	;;
 evalmacro)
