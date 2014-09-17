@@ -219,13 +219,13 @@ findlua() {
 			[ ${#F} -gt 0 -a "${F}" != "false" ] || continue
 
 			# skip paths with wildcards
-			[ "${F#*"*"}" = "${F}" ] || continue
-			[ "${F#*"["}" = "${F}" ] || continue
+			[ "${F#*[*]}" = "${F}" ] || continue
+			[ "${F#*[[]}" = "${F}" ] || continue
 
 			V="$(getapi "${F}")"
 			R="$(getrel "${F}")"
-			: ${V:-0}
-			: ${R:-0}
+			: ${V:=0}
+			: ${R:=0}
 
 			debug "%s is version %s (%s API)" "${F}" "$(num2ver "${R}")" "$(num2api "${V}")"
 
