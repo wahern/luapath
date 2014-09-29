@@ -52,6 +52,9 @@
 #
 # * 2014-01-26 - Migrate CC vendor detection from external script.
 #
+# * 2014-09-29 - Add ldir and cdir modes which print install path by parsing
+# 	package.path and package.cpath.
+#
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 # Copyright (C) 2012-2013 William Ahern
@@ -84,7 +87,7 @@ unset IFS # no field splitting surprises
 : ${TMPDIR:=/tmp} # sane TMPDIR
 : ${CC:=cc}
 
-MYVERSION=20140126
+MYVERSION=20140929
 MYVENDOR="william@25thandClement.com"
 
 
@@ -184,7 +187,7 @@ ndirs() {
 #
 # 	PATH   Header identifier--#include <PATH>
 # 	MACRO  Macro identifier
-# 	REGEX  Optional regex pattern to match macro evalutation result
+# 	REGEX  Optional regex pattern to match macro evaluation result
 # 	SUBST  Optional replacement expression
 #
 evalmacro() {
@@ -742,6 +745,10 @@ usage() {
 	               (e.g. "luac5.?"; default is "luac*")
 	  lua [GLOB]   print path to lua interpreter using optional glob patterns
 	               (e.g. "lua luajit"; default is "lua*")
+	  ldir [GLOB]  print module install path, where GLOB is used for finding
+	               the lua interpreter for accessing package.path
+	  cdir [GLOB]  print C module install path, where GLOB is used for finding
+	               the lua interpreter for accessing package.cpath
 	  ccname       print CC name (e.g. sunpro, clang, gcc)
 	  evalmacro    run internal macro evaluator for debugging
 	  testsym      run internal library symbol reader for debugging
@@ -974,7 +981,9 @@ luac)
 	printf -- "${LUAC_PATH}\n"
 
 	;;
-lua)
+lua|ldir|cdir)
+	cmd="$1"
+
 	shift
 
 	if [ $# -eq 0 ]; then
@@ -985,7 +994,19 @@ lua)
 
 	[ -n "${LUA_PATH}" ] || exit 1
 	
-	printf -- "${LUA_PATH}\n"
+	case "${cmd}" in
+	ldir)
+		${LUA_PATH} -e 'for dir in package.path:gmatch("([^;?]+)/") do if dir ~= "." then print(dir) os.exit() end end os.exit(1)'
+
+		;;
+	cdir)
+		${LUA_PATH} -e 'for dir in package.cpath:gmatch("([^;?]+)/") do if dir ~= "." then print(dir) os.exit() end end os.exit(1)'
+
+		;;
+	*)
+		printf -- "${LUA_PATH}\n"
+		;;
+	esac
 
 	;;
 ccname)
