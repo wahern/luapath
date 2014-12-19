@@ -782,6 +782,8 @@ findluac() {
 isinteger() {
 	I="${1}"
 
+	[ "${#I}" -gt 0 ] || return 1
+
 	while [ "${#I}" -gt 0 ]; do
 		if [ "${I##[0123456789]}" = "${I}" ]; then
 			return 1
