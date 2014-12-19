@@ -64,6 +64,10 @@
 # 	rather than globs for finding the lua utility path (use the new -e
 # 	option, instead).
 #
+# * 2014-12-19 - Fix pkg-config version matching. The --modversion of
+# 	the lua package might be stale. For example, it's 5.2.0 on Ubuntu
+# 	14.04 even though the Lua release is 5.2.3.
+#
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 # Copyright (C) 2012-2014 William Ahern
@@ -96,7 +100,7 @@ unset IFS # no field splitting surprises
 : ${TMPDIR:=/tmp} # sane TMPDIR
 : ${CC:=cc}
 
-MYVERSION=20141218
+MYVERSION=20141219
 MYVENDOR="william@25thandClement.com"
 
 
@@ -332,22 +336,36 @@ luapc() {
 
 	[ -n "${PKGCONFIG}" ] || return 0
 
+	# find pkg-config library name
 	if [ -z "${LUAPC_LIB}" ]; then
 		V="$(${LUA_PATH} -v </dev/null 2>&1 | head -n1 | sed -ne 's/^Lua[^ ]* \([0123456789][0123456789]*\(\.[0123456789][0123456789]*\)*\).*/\1/p')"
 
 		[ -n "${V}" ] || return 0
 
+		V_N=$(mmp2num "${V}")
+
 		for LIB in $(${PKGCONFIG} --list-all </dev/null 2>>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p'); do
 			M="$(${PKGCONFIG} --modversion ${LIB} || true)"
 
-			# try to remove any distribution suffix
-			M="${M%%-*}"
-			M="${M%%+*}"
-
+			# break immediately on exact match
 			if [ "${V}" = "${M}" ]; then
 				LUAPC_LIB="${LIB}"
 
 				break
+			fi
+
+			#
+			# NOTE: On Ubuntu 14.04 pkg-config --modversion
+			# lua5.2 prints 5.2.0 even though the release
+			# version is 5.2.3 (what lua5.2 -v prints).
+			#
+			# If the major.minor components match, then
+			# tentatively use that package name.
+			#
+			M_N=$(mmp2num "${M}" 0 0 0)
+
+			if [ "$((${V_N} / 100))" -eq "$((${M_N} / 100))" ]; then
+				LUAPC_LIB="${LIB}"
 			fi
 		done
 
@@ -378,27 +396,50 @@ findinstalldir() {
 		[ -n "${DIR}" ] && set -- "$@" "${DIR}/lua/${V_DIR}"
 
 		DIR="$(luapc --variable prefix)"
-		[ -n "${DIR}" ] && set -- "$@" "${dir}/lib/lua/${V_DIR}"
+		[ -n "${DIR}" ] && set -- "$@" "${DIR}/lib/lua/${V_DIR}"
 	else
 		DIR="$(luapc --variable INSTALL_LMOD)"
 		[ -n "${DIR}" ] && set -- "$@" "${DIR}"
 
 		DIR="$(luapc --variable prefix)"
-		[ -n "${DIR}" ] && set -- "$@" "${dir}/share/lua/${V_DIR}"
+		[ -n "${DIR}" ] && set -- "$@" "${DIR}/share/lua/${V_DIR}"
 	fi
 
 	${LUA_PATH} - "$@" <<-EOF
+		--
+		-- actual pkg-config variable on Ubuntu 14.04
+		--
+		-- 	/usr//share/lua/5.1
+		--
+		local function fixpath(path)
+			local stack = { path:match"^/" and "" or "." }
+
+			for ent in path:gmatch"([^/]+)" do
+				if ent == ".." and #stack > 1 then
+					stack[#stack] = nil
+				elseif ent ~= "." then
+					stack[#stack + 1] = ent
+				end
+			end
+
+			return table.concat(stack, "/")
+		end
+
 		local dirs = { }
 
 		for dir in ${WHAT}:gmatch"([^;?]+)/" do
+			dir = fixpath(dir)
+
 			if dir ~= "." then
 				dirs[#dirs + 1] = dir
 			end
 		end
 
 		for _, arg in ipairs{ ... } do
+			arg = fixpath(arg)
+
 			for _, dir in ipairs(dirs) do
-				if #arg > 0 and arg == dir then
+				if arg == dir then
 					print(dir)
 					os.exit(0)
 				end
@@ -738,17 +779,27 @@ findluac() {
 }
 
 
+isinteger() {
+	I="${1}"
+
+	while [ "${#I}" -gt 0 ]; do
+		if [ "${I##[0123456789]}" = "${I}" ]; then
+			return 1
+		fi
+
+		I=${I##[0123456789]}
+	done
+
+	return 0
+}
+
+
 checkints() {
 	while [ $# -gt 0 ]; do
-		I="${1}"
-		while [ "${#I}" -gt 0 ]; do
-			if [ "${I##[0123456789]}" = "${I}" ]; then
-				printf -- "${0##*/}: ${1}: not a number\n" >&2
-				exit 1
-			fi
-
-			I=${I##[0123456789]}
-		done
+		if ! isinteger "${1}"; then
+			printf -- "${0##*/}: ${1}: not a number\n" >&2
+			return 1
+		fi
 
 		shift
 	done
@@ -787,6 +838,33 @@ jit2num() {
 	M=${1:-${M}}
 	m=${2:-${m}}
 	p=${3:-${p}}
+
+	checkints $M $m $p
+
+	printf "$((${M} * 10000 + ${m} * 100 + ${p}))\n"
+}
+
+
+mmp2num() {
+	M="${2:-0}"
+	m="${3:-0}"
+	p="${4:-0}"
+
+	IFS=".+-_"
+	set -- ${1}
+	unset IFS
+
+	if isinteger "${1}"; then
+		M=${1}
+	fi
+
+	if isinteger "${2}"; then
+		m=${2}
+	fi
+
+	if isinteger "${3}"; then
+		p=${3}
+	fi
 
 	checkints $M $m $p
 
