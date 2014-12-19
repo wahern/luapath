@@ -96,7 +96,7 @@ unset IFS # no field splitting surprises
 : ${TMPDIR:=/tmp} # sane TMPDIR
 : ${CC:=cc}
 
-MYVERSION=20140929
+MYVERSION=20141218
 MYVENDOR="william@25thandClement.com"
 
 
