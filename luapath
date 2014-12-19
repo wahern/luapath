@@ -68,6 +68,10 @@
 # 	the lua package might be stale. For example, it's 5.2.0 on Ubuntu
 # 	14.04 even though the Lua release is 5.2.3.
 #
+# 	Use the interpreter path as a reference point when searching for
+# 	headers. $(dirname ${LUA_PATH})/../include is a very likely location
+# 	as bindir and includedir have the same prefix in most installations.
+#
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 # Copyright (C) 2012-2014 William Ahern
@@ -557,6 +561,26 @@ findversion() {
 			done
 		done
 	fi
+
+
+	# if we can find the lua interpreter, use it as a reference for
+	# header locations.
+	if findlua; then
+		D="${LUA_PATH%/*}"
+		D="${D%/*}/include"
+
+		if [ -d "${D}" ]; then
+			for F in $(find "${D}" ${MAXDEPTH} ${XDEV} -name lua.h -print 2>>/dev/null); do
+				tryluainclude "${F}"
+
+				if foundversion; then
+					return 0
+				fi
+			done
+		fi
+	fi
+
+	[ "${API_VER:-0}" -gt 0 ];
 }
 
 
@@ -746,6 +770,12 @@ safeperm() {
 
 
 findluac() {
+	if [ $# -eq 0 ]; then
+		IFS=:
+		set -- ${GLOB:-${GLOB_LUAC}}
+		unset IFS
+	fi
+
 	while [ $# -gt 0 ]; do
 		for F in $(findpath "${1}" no "${PATH}"; findpath "${1}" "${RECURSE}" "${BINDIRS}"); do
 			[ -x "$F" ] && safeperm "$F" || continue
@@ -875,6 +905,12 @@ mmp2num() {
 
 
 findlua() {
+	if [ $# -eq 0 ]; then
+		IFS=:
+		set -- ${GLOB:-${GLOB_LUA}}
+		unset IFS
+	fi
+
 	while [ $# -gt 0 ]; do
 		for F in $(findpath "${1}" no "${PATH}"; findpath "${1}" "${RECURSE}" "${BINDIRS}"); do
 			[ -x "$F" ] && safeperm "$F" || continue
@@ -1156,7 +1192,7 @@ fi
 
 case "${1:-}" in
 cppflags)
-	findversion
+	findversion || exit 1
 
 	[ "${API_VER:-0}" -gt 0 ] || exit 1
 
@@ -1172,9 +1208,7 @@ ldflags)
 
 	;;
 version)
-	findversion
-
-	[ "${API_VER:-0}" -gt 0 ] || exit 1
+	findversion || exit 1
 
 	printf "$(((${API_VER} / 100) % 100)).$((($API_VER) % 100))\n"
 
