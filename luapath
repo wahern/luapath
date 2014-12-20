@@ -530,7 +530,10 @@ findversion() {
 	fi
 
 
-	[ "${RECURSE}" = "yes" ] || return 0
+	if [ "${RECURSE}" != "yes" ]; then
+		[ "${API_VER:-0}" -gt 0 ]
+		return $?
+	fi
 
 
 	# recurse into CPPDIRS
@@ -586,7 +589,7 @@ findversion() {
 		fi
 	fi
 
-	[ "${API_VER:-0}" -gt 0 ];
+	[ "${API_VER:-0}" -gt 0 ]
 }
 
 
