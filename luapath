@@ -103,6 +103,8 @@ export LC_ALL=C # no locale headaches
 unset IFS # no field splitting surprises
 : ${TMPDIR:=/tmp} # sane TMPDIR
 : ${CC:=cc}
+unset LUA_PATH || true # interferes search for module install directory
+unset LUA_CPATH || true
 
 MYVERSION=20141219
 MYVENDOR="william@25thandClement.com"
