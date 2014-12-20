@@ -384,12 +384,9 @@ luapc() {
 # findinstalldir  package.path|package.cpath ...
 #
 findinstalldir() {
-	WHAT="$1"
-	shift
-
 	V_DIR=$((${LUA_VER} / 100 % 100)).$((${LUA_VER} % 100))
 
-	if [ "${WHAT}" = "package.cpath" ]; then
+	if [ "${1}" = "package.cpath" ]; then
 		DIR="$(luapc --variable INSTALL_CMOD)"
 		[ -n "${DIR}" ] && set -- "$@" "${DIR}"
 
@@ -407,6 +404,13 @@ findinstalldir() {
 
 		DIR="$(luapc --variable prefix)"
 		[ -n "${DIR}" ] && set -- "$@" "${DIR}/share/lua/${V_DIR}"
+	fi
+
+	ARRAY="${1}"
+	shift
+
+	if [ $# -eq 0 ]; then
+		set -- "/nonexistent" # cannot expand empty $@ on some implementations
 	fi
 
 	${LUA_PATH} - "$@" <<-EOF
@@ -431,7 +435,7 @@ findinstalldir() {
 
 		local dirs = { }
 
-		for dir in ${WHAT}:gmatch"([^;?]+)/" do
+		for dir in ${ARRAY}:gmatch"([^;?]+)/" do
 			dir = fixpath(dir)
 
 			if dir ~= "." then
@@ -1224,12 +1228,11 @@ libv*)
 luac)
 	shift
 
-	append GLOB $*
-	IFS=:
-	set -- ${GLOB:-${GLOB_LUAC}}
-	unset IFS
+	if [ $# -gt 0 ]; then
+		append GLOB $*
+	fi
 
-	findluac $* || exit 1
+	findluac || exit 1
 	
 	printf -- "${LUAC_PATH}\n"
 
@@ -1237,12 +1240,11 @@ luac)
 lua)
 	shift
 
-	append GLOB $*
-	IFS=:
-	set -- ${GLOB:-${GLOB_LUA}}
-	unset IFS
+	if [ $# -gt 0 ]; then
+		append GLOB $*
+	fi
 
-	findlua $* || exit 1
+	findlua || exit 1
 
 	printf -- "${LUA_PATH}\n"
 
@@ -1252,12 +1254,11 @@ ldir|cdir)
 	MODE="${1}"
 	shift
 
-	append GLOB $*
-	IFS=:
-	set -- ${GLOB:-${GLOB_LUA}}
-	unset IFS
+	if [ $# -gt 0 ]; then
+		append GLOB $*
+	fi
 
-	findlua $* || exit 1
+	findlua || exit 1
 
 	if [ "${MODE}" = "cdir" ]; then
 		findinstalldir package.cpath
@@ -1267,24 +1268,9 @@ ldir|cdir)
 
 	;;
 package.path|package.cpath)
-	MODE="${1}"
-	shift
+	findlua || exit 1
 
-	IFS=:
-	PATHS="$*"
-	unset IFS
-
-	IFS=:
-	set -- ${GLOB:-${GLOB_LUA}}
-	unset IFS
-
-	findlua $* || exit 1
-
-	IFS=:
-	set -- ${PATHS}
-	unset IFS
-
-	findinstalldir "${MODE}" "$@" || exit 1
+	findinstalldir "$@" || exit 1
 
 	;;
 ccname)
