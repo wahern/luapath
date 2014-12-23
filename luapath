@@ -22,7 +22,7 @@
 # warned.
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# 
+#
 # Changelog:
 #
 # * 2013-08-02 - Published. Derived from an earlier script, lua.path,
@@ -163,7 +163,7 @@ xdirs() {
 
 	set -- ${2:-}
 
-	while [ $# -gt 0 ]; do 
+	while [ $# -gt 0 ]; do
 		case "${1}" in
 		-${OPTC})
 			shift
@@ -1238,7 +1238,7 @@ luac)
 	fi
 
 	findluac || exit 1
-	
+
 	printf -- "${LUAC_PATH}\n"
 
 	;;
