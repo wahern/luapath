@@ -895,15 +895,15 @@ mmp2num() {
 	set -- ${1}
 	unset IFS
 
-	if isinteger "${1}"; then
+	if isinteger "${1:-}"; then
 		M=${1}
 	fi
 
-	if isinteger "${2}"; then
+	if isinteger "${2:-}"; then
 		m=${2}
 	fi
 
-	if isinteger "${3}"; then
+	if isinteger "${3:-}"; then
 		p=${3}
 	fi
 
