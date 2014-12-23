@@ -106,7 +106,7 @@ unset IFS # no field splitting surprises
 unset LUA_PATH || true # interferes search for module install directory
 unset LUA_CPATH || true
 
-MYVERSION=20141219
+MYVERSION=20141222
 MYVENDOR="william@25thandClement.com"
 
 
