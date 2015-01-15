@@ -72,9 +72,15 @@
 # 	headers. $(dirname ${LUA_PATH})/../include is a very likely location
 # 	as bindir and includedir have the same prefix in most installations.
 #
+# * 2014-01-15 - Quote more command names and arguments. Still need to
+# 	handle space characters in code that employs command substitution. I
+# 	think we could handle all whitespace characters, including newlines,
+# 	by using a control character in IFS and using --exec printf "%s\1" {}
+# 	rather than -print with find(1).
+#
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
-# Copyright (C) 2012-2014 William Ahern
+# Copyright (C) 2012-2015 William Ahern
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -106,7 +112,7 @@ unset IFS # no field splitting surprises
 unset LUA_PATH || true # interferes search for module install directory
 unset LUA_CPATH || true
 
-MYVERSION=20141222
+MYVERSION=20150115
 MYVENDOR="william@25thandClement.com"
 
 
@@ -230,7 +236,7 @@ append() {
 #
 evalmacro() {
 	printf "#include <$1>\n[===[$2]===]\n" \
-	| ${CC:-cc} ${CPPFLAGS:-} -E - 2>>/dev/null \
+	| "${CC:-cc}" ${CPPFLAGS:-} -E - 2>>/dev/null \
 	| sed -ne "
 		s/^.*\\[===\\[ *\\(${3:-.*}\\) *\\]===\\].*$/${4:-\\1}/
 		t Found
@@ -262,7 +268,7 @@ testsym() {
 
 
 tryluainclude() {
-	V="$(evalmacro ${1} LUA_VERSION_NUM '[0123456789][0123456789]*')"
+	V="$(evalmacro "${1}" LUA_VERSION_NUM '[0123456789][0123456789]*')"
 	: ${V:=0}
 
 	if [ "${1%/*}" != "${1}" ]; then
@@ -285,7 +291,7 @@ tryluainclude() {
 	[ "$V" -ge "${API_MIN}" -a "$V" -le "${API_MAX}" ] || return 0
 
 	if [ -n "${JIT_REQ}" ]; then
-		J="$(evalmacro ${1%%lua.h}luajit.h LUAJIT_VERSION_NUM '[0123456789][0123456789]*')"
+		J="$(evalmacro "${1%%lua.h}luajit.h" LUAJIT_VERSION_NUM '[0123456789][0123456789]*')"
 		: ${J:=0}
 
 		if [ "${JIT_REQ}" = "skip" ]; then
@@ -344,14 +350,14 @@ luapc() {
 
 	# find pkg-config library name
 	if [ -z "${LUAPC_LIB}" ]; then
-		V="$(${LUA_PATH} -v </dev/null 2>&1 | head -n1 | sed -ne 's/^Lua[^ ]* \([0123456789][0123456789]*\(\.[0123456789][0123456789]*\)*\).*/\1/p')"
+		V="$("${LUA_PATH}" -v </dev/null 2>&1 | head -n1 | sed -ne 's/^Lua[^ ]* \([0123456789][0123456789]*\(\.[0123456789][0123456789]*\)*\).*/\1/p')"
 
 		[ -n "${V}" ] || return 0
 
 		V_N=$(mmp2num "${V}")
 
-		for LIB in $(${PKGCONFIG} --list-all </dev/null 2>>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p'); do
-			M="$(${PKGCONFIG} --modversion ${LIB} || true)"
+		for LIB in $("${PKGCONFIG}" --list-all </dev/null 2>>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p'); do
+			M="$("${PKGCONFIG}" --modversion ${LIB} || true)"
 
 			# break immediately on exact match
 			if [ "${V}" = "${M}" ]; then
@@ -415,7 +421,7 @@ findinstalldir() {
 		set -- "/nonexistent" # cannot expand empty $@ on some implementations
 	fi
 
-	${LUA_PATH} - "$@" <<-EOF
+	"${LUA_PATH}" - "$@" <<-EOF
 		--
 		-- actual pkg-config variable on Ubuntu 14.04
 		--
@@ -496,7 +502,7 @@ findversion() {
 
 
 	if [ -n "${PKGCONFIG}" ]; then
-		PKGFLAGS="$(${PKGCONFIG} --list-all </dev/null 2>>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p' | xargs -- ${PKGCONFIG} --cflags 2>>/dev/null | cat)"
+		PKGFLAGS="$("${PKGCONFIG}" --list-all </dev/null 2>>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p' | xargs -- ${PKGCONFIG} --cflags 2>>/dev/null | cat)"
 		PKGDIRS="$(idirs "${PKGFLAGS}")"
 
 		IFS=:
@@ -543,7 +549,7 @@ findversion() {
 
 	if [ $# -gt 0 ]; then
 		for D; do
-			for F in $(find ${D} ${MAXDEPTH} ${XDEV} -name lua.h -print 2>>/dev/null); do
+			for F in $(find "${D}" ${MAXDEPTH} ${XDEV} -name lua.h -print 2>>/dev/null); do
 				tryluainclude "${F}"
 
 				if foundversion; then
@@ -561,7 +567,7 @@ findversion() {
 
 	if [ $# -gt 0 ]; then
 		for D; do
-			for F in $(find ${D}/. ${MAXDEPTH} ${XDEV} -name lua.h -print 2>>/dev/null); do
+			for F in $(find "${D}/." ${MAXDEPTH} ${XDEV} -name lua.h -print 2>>/dev/null); do
 				tryluainclude "${F}"
 
 				if foundversion; then
@@ -691,7 +697,7 @@ foundlib() {
 
 findlib() {
 	if [ -n "${PKGCONFIG}" ]; then
-		PKGFLAGS="$(${PKGCONFIG} --list-all </dev/null 2>>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p' | xargs -- ${PKGCONFIG} --libs 2>>/dev/null | cat)"
+		PKGFLAGS="$("${PKGCONFIG}" --list-all </dev/null 2>>/dev/null | sed -ne 's/^\(lua[^ 	]*\).*/\1/p' | xargs -- ${PKGCONFIG} --libs 2>>/dev/null | cat)"
 		PKGDIRS="$(ldirs "${PKGFLAGS}")"
 		PKGDIRS="${PKGDIRS}${PKGDIRS:+:}/lib:/usr/lib:/usr/local/lib"
 		NUMDIRS="$(count "${PKGDIRS}")"
@@ -789,7 +795,7 @@ findluac() {
 		for F in $(findpath "${1}" no "${PATH}"; findpath "${1}" "${RECURSE}" "${BINDIRS}"); do
 			[ -x "$F" ] && safeperm "$F" || continue
 
-			V="$($F -v </dev/null 2>&1 | head -n1 | sed -ne 's/^Lua \([0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
+			V="$("$F" -v </dev/null 2>&1 | head -n1 | sed -ne 's/^Lua \([0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
 			: ${V:=0}
 			V="$((${V%%.*} * 100 + ${V##*.} % 100))"
 
@@ -924,7 +930,7 @@ findlua() {
 		for F in $(findpath "${1}" no "${PATH}"; findpath "${1}" "${RECURSE}" "${BINDIRS}"); do
 			[ -x "$F" ] && safeperm "$F" || continue
 
-			V="$($F -e 'print(string.match(_VERSION, [[[%d.]+]]))' </dev/null 2>>/dev/null | head -n1 | sed -ne 's/^\([0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
+			V="$("$F" -e 'print(string.match(_VERSION, [[[%d.]+]]))' </dev/null 2>>/dev/null | head -n1 | sed -ne 's/^\([0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
 			: ${V:=0}
 			V="$((${V%%.*} * 100 + ${V##*.} % 100))"
 
@@ -935,7 +941,7 @@ findlua() {
 			[ "${V}" -ge "${API_MIN}" -a "${V}" -le "${API_MAX}" ] || continue
 
 			if [ -n "${JIT_REQ}" ]; then
-				J="$($F -v </dev/null 2>&1 | head -n1 | sed -ne 's/^LuaJIT \([0123456789][0123456789]*\.[0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
+				J="$("$F" -v </dev/null 2>&1 | head -n1 | sed -ne 's/^LuaJIT \([0123456789][0123456789]*\.[0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
 				J="$(jit2num ${J:-0})"
 
 				if [ "${JIT_REQ}" = "skip" ]; then
@@ -965,7 +971,7 @@ findlua() {
 
 
 ccname() {
-	${CC} -E - <<-EOF | awk '/sunpro/||/clang/||/gcc/||/other/{ print $1; exit; }'
+	"${CC}" -E - <<-EOF | awk '/sunpro/||/clang/||/gcc/||/other/{ print $1; exit; }'
 		#if defined __SUNPRO_C
 		sunpro
 		#elif defined __clang__
@@ -1147,8 +1153,8 @@ done
 shift $(($OPTIND - 1))
 
 
-for U in ${CC:-cc} find grep od rm rmdir sed xargs; do
-	if ! command -v ${U} >>/dev/null 2>&1; then
+for U in "${CC:-cc}" find grep od rm rmdir sed xargs; do
+	if ! command -v "${U}" >>/dev/null 2>&1; then
 		printf -- "${0##*/}: ${U}: command not found\n" >&2
 	fi
 done
