@@ -72,7 +72,7 @@
 # 	headers. $(dirname ${LUA_PATH})/../include is a very likely location
 # 	as bindir and includedir have the same prefix in most installations.
 #
-# * 2014-01-15 - Quote more command names and arguments. Still need to
+# * 2015-01-15 - Quote more command names and arguments. Still need to
 # 	handle space characters in code that employs command substitution. I
 # 	think we could handle all whitespace characters, including newlines,
 # 	by using a control character in IFS and using --exec printf "%s\1" {}
