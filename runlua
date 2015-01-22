@@ -98,7 +98,7 @@ debug() {
 }
 
 tempnam() {
-	printf "%s-%s\n" "${1}" "$(od -An -N8 -tx1 -v /dev/urandom 2>>/dev/null | tr -Cd '0-9a-f')"
+	printf "%s-%s\n" "${1}" "$(od -An -N8 -tx1 -v /dev/urandom 2>>/dev/null | tr -cd '0-9a-f')"
 }
 
 # isinteger STRING
@@ -201,7 +201,7 @@ findlua() {
 
 	for D; do
 		# get abspath because getapi and getrel cd to working directory
-		D="$(cd "${D}" && pwd)"
+		D="$(! cd "${D}" 2>>/dev/null || pwd)"
 		[ -n "${D}" ] || continue
 
 		set -- "false" # see porting note "$@"
@@ -254,7 +254,7 @@ escape() {
 	printf "%s" "${1}" | \
 	od -An -tu1 -v | \
 	sed -e 's/\([0123456789][0123456789]*\)/\\\1/g' | \
-	tr -Cd '\\0123456789'
+	tr -cd '\\0123456789'
 }
 
 quote() {
