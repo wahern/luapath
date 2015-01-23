@@ -103,7 +103,7 @@ debug() {
 }
 
 tempnam() {
-	printf "%s-%s\n" "${1}" "$(od -An -N8 -tx1 -v /dev/urandom 2>>/dev/null | tr -cd '0-9a-f')"
+	printf "%s-%s\n" "${1}" "$(od -An -N8 -tx1 -v /dev/urandom 2>>/dev/null | tr -cd '0123456789abcdef')"
 }
 
 # isinteger STRING
@@ -264,7 +264,13 @@ escape() {
 	tr -cd '\\0123456789'
 }
 
-quote() {
+noenv() {
+	for F in $(env | sed -ne 's/^\(LUA_C\{0,1\}PATH[_0123456789]*\).*$/\1/p' -e 's/^\(LUA_INIT[_0123456789]*\).*$/\1/p'); do
+		unset "$F" || true # see porting note "unset"
+	done
+}
+
+loader() {
 	I=$#
 	while [ $I -gt 0 ]; do
 		set -- "$@" "\"$(escape "${1}")\""
@@ -273,17 +279,9 @@ quote() {
 	done
 
 	IFS=","
-	printf "%s" "$*"
+	ARGS="$*"
 	unset IFS
-}
 
-noenv() {
-	for F in $(env | sed -ne 's/^\(LUA_C\{0,1\}PATH[_0123456789]*\).*$/\1/p' -e 's/^\(LUA_INIT[_0123456789]*\).*$/\1/p'); do
-		unset "$F" || true # see porting note "unset"
-	done
-}
-
-loader() {
 	cat <<-EOF
 	local function loadpath(skip, path)
 		local fh = assert(io.open(path, "r"))
@@ -315,7 +313,7 @@ loader() {
 		end
 
 		return (loadpath(skip, path))(...)
-	end)($(quote "$@"))
+	end)($ARGS)
 	EOF
 }
 
