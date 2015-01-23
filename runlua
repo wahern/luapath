@@ -58,7 +58,7 @@
 #
 # Also, the first mode requires a fully qualified path name, whereas with
 # the second mode the shell code in the header can locate runlua
-# dynamically. For example, a regression or example script in a projet
+# dynamically. For example, a regression or example script in a project
 # repository might have a header like
 #
 #   #!/bin/sh
