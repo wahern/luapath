@@ -74,9 +74,7 @@ JIT_MIN=00000
 JIT_MAX=999999
 
 TMPWD=
-SKIP=
 DEBUG=
-PRINT=
 
 warn() {
 	if [ -n "${DEBUG:-}" -a -t 2 ]; then
@@ -278,25 +276,7 @@ noenv() {
 
 loader() {
 	S=$1 # number of lines to skip
-	N=$2 # number of arguments to pass to loader
-	shift 2
-
-	#
-	# The argument list we're given includes the interpreter arguments
-	# _appended_ to the list. The loader code we generated will be
-	# appended to this list, so the caller hasn't yet left-rotated the
-	# list to put things into the proper order for interpreter
-	# invocation. We have to rotate it here so we can drop those
-	# interpreter arguments.
-	#
-	I=0
-	while [ $I -lt $N ]; do
-		set -- "$@" "$1"
-		shift 1
-		I=$(($I + 1))
-	done
-
-	shift $(($# - $N))
+	shift 1
 
 	cat <<-EOF
 	local function loadpath(skip, path)
@@ -331,7 +311,7 @@ usage() {
 	Usage: ${0##*/} [-e:l:vEr:j:Js:tdpVh] PATH [...]
 	  -e STRING  execute statement
 	  -l STRING  require package
-	  -v         show interpreter version information
+	  -v         print interpreter version information
 	  -E         ignore environment variables
 	  -r RANGE   run specific Lua version
 	  -j RANGE   run specific LuaJIT version
@@ -340,7 +320,7 @@ usage() {
 	  -t         preload POSIX threading library
 	  -d         enable debug logging
 	  -p         print path of Lua interpreter
-	  -V         show runlua version information
+	  -V         print runlua version information
 	  -h         print this usage message
 
 	BNF:
@@ -348,12 +328,12 @@ usage() {
 	  <RANGE>   ::= <VERSION> | [VERSION] "-" [VERSION]
 	  <VERSION> ::= <NUMBER> ["." <NUMBER> ["." <NUMBER>]]
 
-        Examples:
-          -j2.1      only run LuaJIT 2.1 interpreter
-          -r5.2.1    only run PUC Lua 5.2.1 interpreter
+	Examples:
+	  -j2.1      only run LuaJIT 2.1 interpreter
+	  -r5.2.1    only run PUC Lua 5.2.1 interpreter
 	  -r5.1      run any Lua 5.1 interpreter, including LuaJIT
-          -r5.2-5.3  run any Lua 5.2 or 5.3 interpreter
-          -r5.2-     run any Lua 5.2 or later interpreter
+	  -r5.2-5.3  run any Lua 5.2 or 5.3 interpreter
+	  -r5.2-     run any Lua 5.2 or later interpreter
 
 	Report bugs to <william@25thandClement.com>
 	EOF
@@ -382,31 +362,30 @@ if [ $# -ge 2 ]; then
 	unset IFS
 fi
 
-# see porting note "$@"
-if [ $# -gt 0 ]; then
-	set -- "$@" "end of original arguments"
-else
-	set -- "end of original arguments"
-fi
-XOPTS=1
+ARGC=0
+pusharg() {
+	eval "ARG${ARGC}=\"\${1}\""
+	ARGC=$((${ARGC} + 1))
+}
+
+SKIP=
+PRINT=
 
 while getopts "e:l:vEr:j:Js:tdpVh" OPTC; do
 	case "${OPTC}" in
 	e)
-		set -- "$@" "-e" "${OPTARG}"
-		XOPTS=$((${XOPTS} + 2))
+		pusharg "-e"
+		pusharg "${OPTARG}"
 		;;
 	l)
-		set -- "$@" "-l" "${OPTARG}"
-		XOPTS=$((${XOPTS} + 2))
+		pusharg "-l"
+		pusharg "${OPTARG}"
 		;;
 	v)
-		set -- "$@" "-v"
-		XOPTS=$((${XOPTS} + 1))
+		pusharg "-v"
 		;;
 	E)
 		noenv
-
 		;;
 	r)
 		LUA_MIN="$(ver2num "${OPTARG%%[,:-]*}" 1 0 0)"
@@ -450,32 +429,49 @@ done
 
 shift $((${OPTIND} - 1))
 
+#
+# If we have to skip any lines we need to load and execute the script
+# through the -e option.
+#
+if [ $# -gt 0 -a -n "${SKIP:-}" ]; then
+	set -- "-e" "$(loader "${SKIP}" "$@")"
+fi
+
+#
+# Prepend our argument stack to the positional list.
+#
+if [ ${ARGC} -gt 0 ]; then
+	# first append to our positional list
+	I=0
+	while [ ${I} -lt ${ARGC} ]; do
+		eval "ARG=\"\${ARG${I}}\""
+
+		if [ $# -gt 0 ]; then
+			set -- "$@" "${ARG}"
+		else
+			set -- "${ARG}"
+		fi
+
+		I=$(($I + 1))
+	done
+
+	# then rotate left
+	I=0
+	N=$(($# - ${ARGC}))
+	while [ ${I} -lt ${N} ]; do
+		set -- "$@" "${1}"
+		shift 1
+
+		I=$(($I + 1))
+	done
+fi
+
 findlua >>/dev/null
 
 if [ "${PRINT:-}" = "yes" ]; then
 	printf "%s\n" "${LUA}"
 	exit 0
 fi
-
-#
-# If we have to skip any lines we need to load and execute the script
-# through the -e option.
-#
-if [ $(($# - ${XOPTS})) -gt 0 -a -n "${SKIP:-}" ]; then
-	set -- "$@" "-e" "$(loader "${SKIP}" $(($# - ${XOPTS})) "$@")"
-	XOPTS=$((${XOPTS} + 2))
-	shift $(($# - ${XOPTS}))
-fi
-
-# left-rotate until arguments we pushed during option parsing come first
-I=0; N=$(($# - ${XOPTS}))
-while [ $I -lt $N ]; do
-	set -- "$@" "$1"
-	shift 1
-	I=$(($I + 1))
-done
-
-shift 1 # drop "end of original arguments"
 
 if [ -n "${_LC_ALL}" ]; then
 	LC_ALL="${_LC_ALL#X}"
