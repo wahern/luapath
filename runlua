@@ -284,25 +284,29 @@ noenv() {
 }
 
 loader() {
-	S=$1 # number of lines to skip
-	shift 1
-
 	cat <<-EOF
 	local function loadpath(skip, path)
 		local fh = assert(io.open(path, "r"))
 		local buf = {}
+		local pat = not tonumber(skip) and skip
+		local skip = tonumber(skip) or 0
 
 		for ln in fh:lines() do
-			if skip > 0 then
+			if pat then
+				if string.match(ln, pat) then
+					pat = nil
+				end
+				ln = string.rep(" ", #ln)
+			elseif skip > 0 then
 				skip = skip - 1
-			else
-				buf[#buf + 1] = ln
+				ln = string.rep(" ", #ln)
 			end
+			buf[#buf + 1] = ln
 		end
 
 		fh:close()
 
-		return (loadstring or load)(table.concat(buf, "\n"), "@"..path)
+		return (loadstring or load)(table.concat(buf, "\n"), "@" .. path)
 	end
 
 	return (function (skip, path, ...)
@@ -311,7 +315,7 @@ loader() {
 		end
 
 		return (loadpath(skip, path))(...)
-	end)(${S}, $(quote "$@"))
+	end)($(quote "$@"))
 	EOF
 }
 
@@ -325,7 +329,7 @@ usage() {
 	  -r RANGE   run specific Lua version
 	  -j RANGE   run specific LuaJIT version
 	  -J         exclude LuaJIT from candidate interpreters
-	  -s NUMBER  number of lines to skip when loading script
+	  -s SKIP    line(s) to skip when loading script
 	  -t         preload POSIX threading library
 	  -d         enable debug logging
 	  -p         print path of Lua interpreter
@@ -336,13 +340,17 @@ usage() {
 	  <PATH>    ::= <STRING>
 	  <RANGE>   ::= <VERSION> | [VERSION] "-" [VERSION]
 	  <VERSION> ::= <NUMBER> ["." <NUMBER> ["." <NUMBER>]]
+	  <SKIP>    ::= <NUMBER> | <PATTERN>
+	  <PATTERN> ::= <STRING>
 
 	Examples:
-	  -j2.1      only run LuaJIT 2.1 interpreter
 	  -r5.2.1    only run PUC Lua 5.2.1 interpreter
 	  -r5.1      run any Lua 5.1 interpreter, including LuaJIT
 	  -r5.2-5.3  run any Lua 5.2 or 5.3 interpreter
 	  -r5.2-     run any Lua 5.2 or later interpreter
+	  -j2.1      only run LuaJIT 2.1 interpreter
+	  -s4        skip first 4 lines of script
+	  -s"^exec"  skip lines up to and including line matching ^exec
 
 	Report bugs to <william@25thandClement.com>
 	EOF
@@ -409,7 +417,7 @@ while getopts "e:l:vEr:j:Js:tdpVh" OPTC; do
 		JIT_MAX=0
 		;;
 	s)
-		isinteger "${OPTARG}" || panic "%s: not an integer" "${OPTARG}"
+		[ ${#OPTARG} -gt 0 ] || panic "-s: empty skip directive"
 		SKIP="${OPTARG}"
 		;;
 	t)
