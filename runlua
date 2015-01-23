@@ -22,9 +22,53 @@
 # ----------------------------------------------------------------------------
 # DESCRIPTION
 #
-# runlua is a POSIX shell script for locating and executing specific Lua
+# runlua is a POSIX shell script for locating and invoking specific Lua
 # interpreter versions. For example, the environment's Lua 5.1 interpreter
-# might be named lua, lua5.1, lua51, luajit, luajit2.0.2, etc.
+# might be named lua, lua5.1, lua51, luajit, luajit2.0.2, etc. runlua
+# automates this difficult task in a safe, portable manner. runlua is
+# regularly tested on Linux, OS X, Solaris, FreeBSD, NetBSD, and OpenBSD.
+# And runlua properly handles all special characters in option arguments.
+#
+# To execute a simple statement in either a Lua 5.2 or 5.3 interpreter,
+#
+#   runlua -r5.2-5.3 -e "print(_VERSION)"
+#
+# The command-line options to runlua are a superset of the standard Lua
+# interpreter. Run `runlua -h` for a description of each option.
+#
+# Shebang (#!) Execution
+#
+# In addition to explicit invocation, runlua supports two modes of shebang
+# execution:
+#
+#   #!/path/to/runlua -t5.2
+#   print"running Lua code!"
+#
+# and
+#
+#   #!/bin/sh
+#   echo "running shell code!"
+#   exec runlua -r5.2 -s"^exec" "$0" "$@"
+#   print "running Lua code!"
+#
+# Only Linux and OS X support the first mode. The second is portable in
+# practice--although POSIX does not require sh to be located at
+# /bin/sh, it nonetheless can be invoked from that location on all the
+# environments I've tested.
+#
+# Also, the first mode requires a fully qualified path name, whereas with
+# the second mode the shell code in the header can locate runlua
+# dynamically. For example, a regression or example script in a projet
+# repository might have a header like
+#
+#   #!/bin/sh
+#   PATH="${PATH}:$(dirname "$0")/../bin"
+#   exec "$(dirname "$0")/../contrib/runlua" -s"^exec" "$0" "$@"
+#   local mymodule = require"mymodule"
+#   -- ...
+#
+# which will work regardless of the current working directory when invoking
+# the script.
 # ----------------------------------------------------------------------------
 # PORTING NOTES
 #
