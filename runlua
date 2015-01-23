@@ -26,9 +26,9 @@
 # interpreter versions. For example, the environment's Lua 5.1 interpreter
 # might be named lua, lua5.1, lua51, luajit, luajit2.0.2, etc. runlua
 # automates this difficult task in a safe, portable manner. runlua is
-# regularly tested on Linux, OS X, Solaris, FreeBSD, NetBSD, and OpenBSD.
-# And runlua safely handles all special characters encountered in option
-# arguments, directory and command paths, and shell variables.
+# regularly tested on Linux, OS X, Solaris, AIX, FreeBSD, NetBSD, and
+# OpenBSD. And runlua safely handles all special characters encountered in
+# option arguments, directory and command paths, and shell variables.
 #
 # To execute a simple statement in either a Lua 5.2 or 5.3 interpreter:
 #
