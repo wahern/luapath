@@ -29,7 +29,7 @@
 # regularly tested on Linux, OS X, Solaris, FreeBSD, NetBSD, and OpenBSD.
 # And runlua properly handles all special characters in option arguments.
 #
-# To execute a simple statement in either a Lua 5.2 or 5.3 interpreter,
+# To execute a simple statement in either a Lua 5.2 or 5.3 interpreter:
 #
 #   runlua -r5.2-5.3 -e "print(_VERSION)"
 #
@@ -41,7 +41,7 @@
 # In addition to explicit invocation, runlua supports two modes of shebang
 # execution:
 #
-#   #!/path/to/runlua -t5.2
+#   #!/path/to/runlua -r5.2
 #   print"running Lua code!"
 #
 # and
