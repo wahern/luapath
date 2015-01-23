@@ -84,7 +84,7 @@ TMPWD=
 DEBUG=
 
 warn() {
-	if [ -n "${DEBUG:-}" -a -t 2 ]; then
+	if [ ${#DEBUG} -gt 0 -a -t 2 ]; then
 		printf "\033[0;31m%s: %.0s${1}\033[0m\n" "${0##*/}" "$@" >&2
 	else
 		printf "%s: %.0s${1}\n" "${0##*/}" "$@" >&2
@@ -97,7 +97,7 @@ panic() {
 }
 
 debug() {
-	if [ -n "${DEBUG:-}" ]; then
+	if [ ${#DEBUG} -gt 0 ]; then
 		printf "%s: %.0s${1}\n" "${0##*/}" "$@" >&2
 	fi
 }
@@ -167,7 +167,7 @@ getrel() {
 }
 
 cdwd() {
-	if [ -n "${TMPWD:-}" ]; then
+	if [ ${#TMPWD} -gt 0 ]; then
 		cd "${TMPWD}"
 	fi
 }
@@ -181,7 +181,7 @@ mkwd() {
 trap "rmwd" EXIT # see portability note "trap EXIT"
 
 rmwd() {
-	if [ -n "${TMPWD:-}" -a -d "${TMPWD}" ]; then
+	if [ ${#TMPWD} -gt 0 -a -d "${TMPWD}" ]; then
 		debug "removing working directory %s" "${TMPWD}"
 		rmdir -- "${TMPWD}"
 		TMPWD=
@@ -209,7 +209,7 @@ findlua() {
 	for D; do
 		# get abspath because getapi and getrel cd to working directory
 		D="$(! cd "${D}" 2>>/dev/null || pwd)"
-		[ -n "${D}" ] || continue
+		[ ${#D} -gt 0 ] || continue
 
 		set -- "false" # see porting note "$@"
 		set +f
@@ -450,7 +450,7 @@ shift $((${OPTIND} - 1))
 # If we have to skip any lines we need to load and execute the script
 # through the -e option.
 #
-if [ $# -gt 0 -a -n "${SKIP:-}" ]; then
+if [ $# -gt 0 -a ${#SKIP} -gt 0 ]; then
 	set -- "-e" "$(loader "${SKIP}" "$@")"
 fi
 
@@ -490,7 +490,7 @@ if [ "${PRINT:-}" = "yes" ]; then
 	exit 0
 fi
 
-if [ -n "${_LC_ALL}" ]; then
+if [ ${#_LC_ALL} -gt 0 ]; then
 	LC_ALL="${_LC_ALL#X}"
 else
 	unset LC_ALL
