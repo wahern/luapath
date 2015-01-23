@@ -28,28 +28,31 @@
 # ----------------------------------------------------------------------------
 # PORTING NOTES
 #
-# unset) On NetBSD (confirmed 6.1.5) unset NAME will fail if no such
-#   variable is set. If errexit is enabled (set -e), execution will fail.
-#   See NetBSD PR 49595.
+# unset) On NetBSD (confirmed up to 6.1.5) unset NAME will exit with a
+#   failure status if no such variable is set. If errexit (set -e) is
+#   enabled then the shell will exit. See NetBSD PR 49595.
 #
 # #!) Linux and OS X permit recursive shebang execution, which some users
-#   might wish to take advantage of. However, neither will field split
+#   might wish to take advantage of. However, neither will field-split
 #   interpreter arguments, instead passing the remainder of the shebang line
-#   as a single positional argument. So we manually field split any first
+#   as a single positional argument. So we manually field-split any first
 #   argument.
 #
-#   Solaris, BSDs, and AIX will search for the interpreter recursively,
-#   following shebang interpreter paths until a binary interpreter is found.
-#   But they will not add each intervening interpreter path to the
-#   positional argument list. If you don't know the paths you cannot execute
-#   them recursively.
+#   Solaris (confirmed 11.1), AIX (confirmed 7.1), OpenBSD (confirmed 5.5),
+#   NetBSD (confirmed 5.1.2, 6.1.1), and FreeBSD (confirmed 9.0) will search
+#   for the interpreter recursively, following shebang interpreter paths
+#   until a binary interpreter is found. But they will not add each
+#   intervening interpreter path to the positional argument list. If you
+#   don't know the paths you cannot execute them recursively.
 #
-# $@) On some BSD shells (confirmed NetBSD 6.1.1, OpenBSD 5.5) expansion of
-#   an empty $@ will trigger an error if set -u is in effect.
+# $@) On some BSD shells (confirmed NetBSD 5.1.2, 6.1.1, OpenBSD 5.5)
+#   expansion of an empty $@ will wrongly trigger an error if nounset (set
+#   -u) is in effect.
 #
-# >>) On some BSD shells (confirmed NetBSD 6.1.1) the noclobber option will
-#   cause redirection to /dev/null using the ">" operator to fail. Use the
-#   append (">>") operator as a workaround.
+# noclobber) On some BSD shells (confirmed NetBSD 5.1.2, 6.1.1) the
+#   noclobber (set -C) option will wrongly cause redirection to /dev/null
+#   using the redirect operator (">") to fail. Use the appending redirect
+#   operator (">>") as a workaround.
 #
 # trap EXIT) On AIX (confirmed 7.1) ksh wrongly executes an EXIT trap when
 #   the calling function returns, rather than when the shell exits. Note
@@ -354,11 +357,11 @@ version() {
 }
 
 #
-# Field split first argument. See porting note "#!".
+# Field-split first argument. See porting note "#!".
 #
 # If we only have one argument than it's either a script path or we're not
-# running as a shebang interpreter. If we have zero than We don't want to accidentally field
-# split the script path becaues it might contain spaces.
+# running as a shebang interpreter. If we have zero than We don't want to
+# accidentally field-split the script path becaues it might contain spaces.
 #
 if [ $# -ge 2 ]; then
 	TMP="${1}"
