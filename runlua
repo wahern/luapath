@@ -51,6 +51,10 @@
 #   cause redirection to /dev/null using the ">" operator to fail. Use the
 #   append (">>") operator as a workaround.
 #
+# trap EXIT) On AIX (confirmed 7.1) ksh wrongly executes an EXIT trap when
+#   the calling function returns, rather than when the shell exits. Note
+#   ksh93 does not exhibit this bug.
+#
 set -e # strict error
 set -u # don't expand unbound variable
 set -f # disable pathname expansion
@@ -169,13 +173,15 @@ mkwd() {
 	TMPWD="$(tempnam "${TMPDIR}/${0##*/}")"
 	debug "creating working directory %s" "${TMPWD}"
 	mkdir -m0500 "${TMPWD}"
-	trap "rmwd" EXIT
 }
+
+trap "rmwd" EXIT # see portability note "trap EXIT"
 
 rmwd() {
 	if [ -n "${TMPWD:-}" -a -d "${TMPWD}" ]; then
 		debug "removing working directory %s" "${TMPWD}"
 		rmdir -- "${TMPWD}"
+		TMPWD=
 	fi
 }
 
