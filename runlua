@@ -363,8 +363,9 @@ loader() {
 
 usage() {
 	cat <<-EOF
-	Usage: ${0##*/} [-e:l:vEr:j:Js:tdpVh] PATH [...]
+	Usage: ${0##*/} [-e:il:vEr:j:Js:tdpVh] [PATH [...]]
 	  -e STRING  execute statement
+	  -i         enter interactive mode after executing PATH
 	  -l STRING  require package
 	  -v         print interpreter version information
 	  -E         ignore environment variables
@@ -430,11 +431,14 @@ pusharg() {
 SKIP=
 PRINT=
 
-while getopts "e:l:vEr:j:Js:tdpVh" OPTC; do
+while getopts "e:il:vEr:j:Js:tdpVh" OPTC; do
 	case "${OPTC}" in
 	e)
 		pusharg "-e"
 		pusharg "${OPTARG}"
+		;;
+	i)
+		pusharg "-i"
 		;;
 	l)
 		pusharg "-l"
