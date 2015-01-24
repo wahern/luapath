@@ -257,6 +257,8 @@ findlua() {
 		[ ${#D} -gt 0 ] || continue
 
 		set -- "false" # see porting note "$@"
+
+		IFS=
 		set +f
 		if [ ! $JIT_MIN -gt 0 ]; then # PUC Lua
 			set -- "$@" ${D}/lu[a] ${D}/lua5* ${D}/lua-5*
@@ -265,6 +267,7 @@ findlua() {
 			set -- "$@" ${D}/luajit*
 		fi
 		set -f
+		unset IFS
 
 		for F; do
 			# strip version suffix from basename
