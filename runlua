@@ -259,7 +259,7 @@ findlua() {
 		set -- "false" # see porting note "$@"
 		set +f
 		if [ ! $JIT_MIN -gt 0 ]; then # PUC Lua
-			set -- "$@" ${D}/lu[a] ${D}/lua5*
+			set -- "$@" ${D}/lua*
 		fi
 		if [ $JIT_MAX -gt 0 ]; then # LuaJIT
 			set -- "$@" ${D}/luajit*
@@ -273,6 +273,14 @@ findlua() {
 			# skip paths with wildcards
 			[ "${F#*[*]}" = "${F}" ] || continue
 			[ "${F#*[[]}" = "${F}" ] || continue
+
+			# skip suffixes that aren't version identifiers
+			B="${F##*/}"
+			while [ "${B}" != "${B%%[0123456789.-]}" ]; do
+				B="${B%%[0123456789.-]}"
+			done
+			debug "stem of %s is %s" "${F##*/}" "${B}"
+			[ "${B}" = "lua" ] || [ "${B}" = "luajit" ] || continue
 
 			V="$(getapi "${F}")"
 			R="$(getrel "${F}")"
