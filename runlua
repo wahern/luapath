@@ -117,7 +117,7 @@ export LC_ALL=C
 : ${PATH:=$(command -p getconf PATH)}
 : ${TMPDIR:=/tmp}
 
-MYVERSION=20150122
+MYVERSION=20150123
 MYVENDOR="william@25thandClement.com"
 
 LUA_MIN=10000
@@ -259,7 +259,7 @@ findlua() {
 		set -- "false" # see porting note "$@"
 		set +f
 		if [ ! $JIT_MIN -gt 0 ]; then # PUC Lua
-			set -- "$@" ${D}/lua*
+			set -- "$@" ${D}/lu[a] ${D}/lua5* ${D}/lua-5*
 		fi
 		if [ $JIT_MAX -gt 0 ]; then # LuaJIT
 			set -- "$@" ${D}/luajit*
@@ -267,19 +267,13 @@ findlua() {
 		set -f
 
 		for F; do
-			# skip empty or dummy paths
-			[ ${#F} -gt 0 -a "${F}" != "false" ] || continue
-
-			# skip paths with wildcards
-			[ "${F#*[*]}" = "${F}" ] || continue
-			[ "${F#*[[]}" = "${F}" ] || continue
-
-			# skip suffixes that aren't version identifiers
+			# strip version suffix from basename
 			B="${F##*/}"
 			while [ "${B}" != "${B%%[0123456789.-]}" ]; do
 				B="${B%%[0123456789.-]}"
 			done
-			debug "stem of %s is %s" "${F##*/}" "${B}"
+
+			# skip if basename isn't "lua" or "luajit"
 			[ "${B}" = "lua" ] || [ "${B}" = "luajit" ] || continue
 
 			V="$(getapi "${F}")"
