@@ -99,9 +99,15 @@
 #   using the redirect operator (">") to fail. Use the appending redirect
 #   operator (">>") as a workaround.
 #
-# trap EXIT) On AIX (confirmed 7.1) ksh wrongly executes an EXIT trap when
+# trap EXIT) ksh88 (confirmed AIX 7.1) wrongly executes an EXIT trap when
 #   the calling function returns, rather than when the shell exits. Note
 #   ksh93 does not exhibit this bug.
+#
+# $@ and null IFS) ksh88 (confirmed AIX 7.1) pdksh (confirmed pdksh 5.2.14)
+#   and pdksh derivatives (confirmed OpenBSD 5.6 ksh, NetBSD 6.1 ksh) will
+#   expand $@ as a single field if IFS is null (set but empty). As a
+#   workaround we set IFS to a control character when juggling paths. ksh93,
+#   bash, and ash correctly expand $@ when IFS is null.
 #
 set -e # strict error
 set -u # don't expand unbound variable
@@ -117,7 +123,7 @@ export LC_ALL=C
 : ${PATH:=$(command -p getconf PATH)}
 : ${TMPDIR:=/tmp}
 
-MYVERSION=20150123
+MYVERSION=20150209
 MYVENDOR="william@25thandClement.com"
 
 LUA_MIN=10000
@@ -126,10 +132,10 @@ JIT_MIN=00000
 JIT_MAX=999999
 
 TMPWD=
-DEBUG=
+DEBUG=0
 
 warn() {
-	if [ ${#DEBUG} -gt 0 -a -t 2 ]; then
+	if [ "${DEBUG}" -gt 0 -a -t 2 ]; then
 		printf "\033[0;31m%s: %.0s${1}\033[0m\n" "${0##*/}" "$@" >&2
 	else
 		printf "%s: %.0s${1}\n" "${0##*/}" "$@" >&2
@@ -142,9 +148,24 @@ panic() {
 }
 
 debug() {
-	if [ ${#DEBUG} -gt 0 ]; then
+	if [ "${DEBUG}" -gt 0 ]; then
 		printf "%s: %.0s${1}\n" "${0##*/}" "$@" >&2
 	fi
+}
+
+dump() {
+	if [ "${DEBUG}" -gt 1 ]; then
+		printf "%s: %.0s${1}\n" "${0##*/}" "$@" >&2
+	fi
+}
+
+# see porting note "$@ and null IFS"
+null_ifs() {
+	IFS=
+	set -- x y z
+	set -- "$@"
+	unset IFS
+	[ $# -gt 1 ] || printf "\2"
 }
 
 tempnam() {
@@ -258,7 +279,7 @@ findlua() {
 
 		set -- "false" # see porting note "$@"
 
-		IFS=
+		IFS="${NULL_IFS="$(null_ifs)"}"
 		set +f
 		if [ ! $JIT_MIN -gt 0 ]; then # PUC Lua
 			set -- "$@" ${D}/lu[a] ${D}/lua5* ${D}/lua-5*
@@ -270,6 +291,10 @@ findlua() {
 		unset IFS
 
 		for F; do
+			[ "${F}" != "false" ] || continue
+
+			dump "testing %s" "${F}"
+
 			# strip version suffix from basename
 			B="${F##*/}"
 			while [ "${B}" != "${B%%[0123456789.-]}" ]; do
@@ -476,7 +501,7 @@ while getopts "e:il:vEr:j:Js:tdpVh" OPTC; do
 		export LD_PRELOAD="libpthread.so"
 		;;
 	d)
-		DEBUG=yes
+		DEBUG="$((${DEBUG} + 1))"
 		;;
 	p)
 		PRINT=yes
