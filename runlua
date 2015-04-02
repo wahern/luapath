@@ -277,15 +277,15 @@ getpth() {
 		# Linux/musl unifies libpthread with libc. But it's a noop
 		# to preload libpthread.so.0 so we don't bother trying to
 		# detect.
-		trypth "${1}" "libpthread.so.0" || true
+		trypth "${1}" "libpthread.so.0" && return 0
 		;;
 	FreeBSD)
 		# FreeBSD doesn't support loading libpthread through a DSO
-		trypth "${1}" "libpthread.so" || true
+		trypth "${1}" "libpthread.so" && return 0
 		;;
 	OpenBSD)
 		# "neither does OpenBSD"
-		trypth "${1}" "libpthread.so" || true
+		trypth "${1}" "libpthread.so" && return 0
 		;;
 	oops)
 		# for regression testing
