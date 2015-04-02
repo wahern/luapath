@@ -261,6 +261,7 @@ trypth() {
 	trypth_LUA="${1}"
 	shift 1
 	for L; do
+		dump "testing LD_PRELOAD=%s %s" "${L}" "${trypth_LUA}"
 		TMP="$(noenv; cdwd; LD_PRELOAD="${L}" "${trypth_LUA}" -e 'print(os.getenv"LD_PRELOAD")' </dev/null 2>>/dev/null || true)"
 		[ "${L}" = "${TMP}" ] || continue
 		printf "%s\n" "${L}" && return 0
@@ -420,6 +421,7 @@ findlua() {
 	[ -n "${LUA}" ] || panic "unable to locate Lua interpreter"
 
 	debug "using %s" "${LUA}"
+	[ -n "${LUA_PRELOAD}" ] && debug "preloading %s" "${LUA_PRELOAD}"
 
 	printf "%s\n" "${LUA}"
 }
@@ -641,7 +643,6 @@ else
 fi
 
 if [ -n "${LUA_PRELOAD-}" ]; then
-	debug "adding %s to LD_PRELOAD" "${LD_PRELOAD}"
 	export LD_PRELOAD="${LD_PRELOAD-}${LD_PRELOAD:+:}${LUA_PRELOAD}"
 fi
 
