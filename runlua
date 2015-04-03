@@ -289,8 +289,16 @@ getpth() {
 		# for regression testing
 		;;
 	Darwin)
-		# libpthread.dylib is symlink to libSystem.dylib.
+		# libpthread.dylib integrated with libSystem.dylib
 		return 0
+		;;
+	SunOS)
+		# libpthread integrated with libc since Solaris 10
+		getpth_V="$(ver2num "$(uname -v)")"
+		getpth_M="$(ver2num "10")"
+		[ ${getpth_V} -ge ${getpth_M} ] && return 0
+
+		trypth "${1}" "libpthread.so" && return 0
 		;;
 	*)
 		return 0
