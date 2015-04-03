@@ -261,10 +261,17 @@ trypth() {
 	trypth_LUA="${1}"
 	shift 1
 	for L; do
-		dump "testing LD_PRELOAD=%s %s" "${L}" "${trypth_LUA}"
-		TMP="$(noenv; cdwd; LD_PRELOAD="${L}" "${trypth_LUA}" -e 'print(os.getenv"LD_PRELOAD")' </dev/null 2>>/dev/null || true)"
-		[ "${L}" = "${TMP}" ] || continue
-		printf "%s\n" "${L}" && return 0
+		dump "testing LD_PRELOAD=\"%s\" %s" "${L}" "${trypth_LUA}"
+		# glibc's ld.so ignores LD_PRELOAD errors. It does emit a
+		# diagnostic to stderr, so we redirect stderr to stdout so
+		# that it corrupts our expected output.
+		#
+		# NB: musl's ld.so ignores LD_PRELOAD errors, but never
+		# issues a diagnostic. There's no way to distinguish success
+		# and failure.
+		TMP="$(noenv; cdwd; LD_PRELOAD="${L}" "${trypth_LUA}" -e 'print"OK"' </dev/null 2>&1 || true)"
+		[ "${TMP}" = "OK" ] && printf "%s\n" "${L}" && return 0
+		dump "unable to preload %s (expected 'OK', got '%s')" "${L}" "$(printf "%s" "${TMP}" | tr '\n' ' ')"
 	done
 
 	return 1
@@ -275,10 +282,13 @@ getpth() {
 	Linux)
 		# Linux/glibc supports loading libpthread through a DSO, but
 		# glibc has several bugs, including a race in libdl.
+		#
 		# Linux/musl unifies libpthread with libc. But it's a noop
 		# to preload libpthread.so.0 so we don't bother trying to
 		# distinguish musl.
-		trypth "${1}" "libpthread.so.0" && return 0
+		set +f
+		trypth "${1}" "libpthread.so.0" /lib/*/libpthread.so* /lib/libpthread.so* && return 0
+		set -f
 		;;
 	FreeBSD|NetBSD|OpenBSD)
 		# Neither FreeBSD, NetBSD, nor OpenBSD support loading
