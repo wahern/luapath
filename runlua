@@ -638,24 +638,6 @@ if istrue "${RUNLUA_E}"; then
 	noenv
 fi
 
-if istrue "${RUNLUA_T}"; then
-	case "$(uname -s)" in
-	Linux)
-		# Linux/glibc supports loading libpthread through a DSO, but
-		# has several bugs, including a race in libdl.
-		LD_PRELOAD="libpthread.so.0"
-		;;
-	FreeBSD)
-		# FreeBSD doesn't support loading libpthread through a DSO
-		LD_PRELOAD="libpthread.so"
-		;;
-	OpenBSD)
-		# ""
-		LD_PRELOAD="libpthread.so"
-		;;
-	esac
-fi
-
 findlua >>/dev/null
 
 if istrue "${RUNLUA_P}"; then
