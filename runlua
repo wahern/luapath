@@ -280,13 +280,10 @@ getpth() {
 		# detect.
 		trypth "${1}" "libpthread.so.0" && return 0
 		;;
-	FreeBSD)
-		# FreeBSD doesn't support loading libpthread through a DSO
-		trypth "${1}" "libpthread.so" && return 0
-		;;
-	OpenBSD)
-		# "neither does OpenBSD"
-		trypth "${1}" "libpthread.so" && return 0
+	FreeBSD|OpenBSD|NetBSD)
+		# Neither FreeBSD, NetNBSD, nor OpenBSD support loading
+		# libpthread through a DSO. NetBSD requires a full path.
+		trypth "${1}" "libpthread.so" "/usr/lib/libpthread.so" && return 0
 		;;
 	oops)
 		# for regression testing
