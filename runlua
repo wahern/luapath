@@ -452,7 +452,7 @@ usage() {
 	  -j RANGE   run specific LuaJIT version
 	  -J         exclude LuaJIT from candidate interpreters
 	  -t         preload POSIX threading library
-	  -d         enable debug logging
+	  -d         enable debug logging (twice for even more logging)
 	  -p         print path of Lua interpreter
 	  -V         print runlua version information
 	  -h         print this usage message
