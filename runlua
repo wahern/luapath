@@ -277,16 +277,24 @@ getpth() {
 		# glibc has several bugs, including a race in libdl.
 		# Linux/musl unifies libpthread with libc. But it's a noop
 		# to preload libpthread.so.0 so we don't bother trying to
-		# detect.
+		# distinguish musl.
 		trypth "${1}" "libpthread.so.0" && return 0
 		;;
-	FreeBSD|OpenBSD|NetBSD)
-		# Neither FreeBSD, NetNBSD, nor OpenBSD support loading
+	FreeBSD|NetBSD|OpenBSD)
+		# Neither FreeBSD, NetBSD, nor OpenBSD support loading
 		# libpthread through a DSO. NetBSD requires a full path.
-		trypth "${1}" "libpthread.so" "/usr/lib/libpthread.so" && return 0
+		set +f
+		trypth "${1}" "libpthread.so" /usr/lib/libpthread.so* && return 0
+		set -f
 		;;
-	oops)
-		# for regression testing
+	*BSD*)
+		# Assume other BSDs are similar and make a best effort.
+		set +f
+		trypth "${1}" "libpthread.so" /usr/lib/libpthread.so* && return 0
+		set -f
+
+		debug "skipping libpthread preloading (unknown operating system: %s)" "${getpth_UNAME}"
+		return 0
 		;;
 	Darwin)
 		# libpthread.dylib integrated with libSystem.dylib
@@ -300,7 +308,11 @@ getpth() {
 
 		trypth "${1}" "libpthread.so" && return 0
 		;;
+	oops)
+		# for regression testing
+		;;
 	*)
+		debug "skipping libpthread preloading (unknown operating system: %s)" "${getpth_UNAME}"
 		return 0
 		;;
 	esac
