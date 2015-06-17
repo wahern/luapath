@@ -136,7 +136,7 @@ export LC_ALL=C
 : ${RUNLUA_D:=}
 : ${RUNLUA_P:=}
 
-MYVERSION=20150401
+MYVERSION=20150617
 MYVENDOR="william@25thandClement.com"
 
 TMPWD=
