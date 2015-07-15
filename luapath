@@ -294,7 +294,7 @@ testsym() {
 	# and within [A-T].
 	(nm -Pg ${1} 2>>/dev/null || nm -g 2>>/dev/null) \
 	| sed -ne '/ [A-T] /p' \
-	| grep -qE "${2}"
+	| grep -q "${2}"
 }
 
 
