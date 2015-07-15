@@ -82,7 +82,7 @@
 # 	hardcode /usr/local/lib/lua/5.1, ordered before the LuaJIT
 # 	installation prefix.
 #
-# * 2015-07-14 - Add recursive glob function implemented in shell code,
+# * 2015-07-14 - Add recursive glob function implemented in shell code
 # 	and use instead of find(1).
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -119,7 +119,7 @@ unset IFS # no field splitting surprises
 unset LUA_PATH || true # interferes search for module install directory
 unset LUA_CPATH || true
 
-MYVERSION=20150119
+MYVERSION=20150714
 MYVENDOR="william@25thandClement.com"
 
 
@@ -133,7 +133,6 @@ LIBDIRS=
 BINDIRS=
 RECURSE=no
 MAXDEPTH=5  # maximum recursion depth
-XDEV=       # do not cross device boundaries; i.e. "-xdev" (OBSOLETE)
 SHORTEST=   # continue searching until shortest pathname found
 PKGCONFIG=  # path to pkg-config, found by `command -v` when -k option invoked
 GLOB=       # -e GLOB expression for lua, luac, ldir, and cdir
@@ -771,15 +770,17 @@ findlib() {
 
 				#printf -- "I=$I K=$K $findlib_L/lib$findlib_l*.*\n"
 
-				for findlib_R in no ${RECURSE}; do
-					for findlib_lib in $(findpath "lib${findlib_l}*.*" ${findlib_R} "${findlib_L}"); do
-						trylib "${findlib_lib}"
-					done
+				glob "${findlib_L}/lib${findlib_l}*.*" 0 trylib || :
 
-					if foundlib; then
-						return 0
-					fi
-				done
+				if foundlib; then
+					return 0;
+				fi
+
+				glob "${findlib_L}/lib${findlib_l}*.*" ${MAXDEPTH} trylib || :
+
+				if foundlib; then
+					return 0;
+				fi
 
 				K=$(($K + 1))
 			done
@@ -800,29 +801,6 @@ findlib() {
 			return 0
 		fi
 	done
-}
-
-
-findpath() {
-	findpath_GLOB="$1"
-	findpath_DIRS="$3"
-	findpath_MAXDEPTH="${MAXDEPTH}"
-
-	if [ "${2}" = "no" ]; then
-		findpath_MAXDEPTH=0
-	fi
-
-	[ ${#findpath_DIRS} -gt 0 ] || return 0
-
-	IFS=:
-	set -- ${findpath_DIRS}
-	unset IFS
-
-	if [ $# -gt 0 ]; then
-		for findpath_D; do
-			glob "${findpath_D}/${findpath_GLOB}" ${findpath_MAXDEPTH} || :
-		done
-	fi
 }
 
 
@@ -1117,7 +1095,6 @@ usage() {
 	  -k           query pkg-config if available
 	  -r           recursively search directories
 	  -m MAXDEPTH  limit recursion to MAXDEPTH
-	  -x           do not cross device mounts when recursing
 	  -s           find shortest pathname, otherwise print first best match
 	  -v VERSION   require specific Lua version or range
 	               (e.g. "5.1" or "5.1-5.2")
@@ -1212,7 +1189,14 @@ while getopts I:L:P:d:De:krm:xsv:j:JVh OPT; do
 		MAXDEPTH="${OPTARG}"
 		;;
 	x)
-		XDEV="-xdev" # OBSOLETE; we no longer use find(1)
+		#
+		# NOTE: This option was
+		#
+		# 	-x  do not cross device mounts when recursing
+		#
+		# but is currently unsupported as our built-in glob function
+		# does not implement this functionality. Previously this
+		# option caused -xdev to be added to invocations of find(1).
 		;;
 	s)
 		SHORTEST=yes
@@ -1268,7 +1252,7 @@ shift $(($OPTIND - 1))
 [ "${RECURSE}" = "yes" ] || MAXDEPTH=0
 
 
-for U in "${CC:-cc}" find grep od rm rmdir sed xargs; do
+for U in "${CC:-cc}" grep od rm rmdir sed xargs; do
 	if ! command -v "${U}" >>/dev/null 2>&1; then
 		printf -- "${0##*/}: ${U}: command not found\n" >&2
 	fi
