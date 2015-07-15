@@ -801,6 +801,21 @@ findlib() {
 			return 0
 		fi
 	done
+
+	# if we can find the lua interpreter, use it as a reference for
+	# library locations.
+	if findlua; then
+		findlib_D="${LUA_PATH%/*}"
+		findlib_D="${findlib_D%/*}/lib"
+
+		if [ -d "${findlib_D}" ]; then
+			glob "${findlib_D}/liblua*.*" "${MAXDEPTH}" trylib || :
+
+			if foundlib; then
+				return 0
+			fi
+		fi
+	fi
 }
 
 
