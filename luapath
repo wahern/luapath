@@ -1121,8 +1121,10 @@ usage() {
 	  -h           print this usage message
 
 	  cppflags       print derived additional CPPFLAGS necessary
+	  version        print derived Lua API version from cppflags discovery
 	  ldflags        print derived additional LDFLAGS necessary (TODO)
-	  version        print derived Lua API version
+	  libs	         print derived additional LIBS necessary (TODO)
+	  libversion     print derived Lua API version from ldflags/libs discovery
 	  luac           print path to luac utility ($(printf "${GLOB_LUA}" | tr ':' ' '))
 	  lua            print path to lua interpreter ($(printf "${GLOB_LUAC}" | tr ':' ' '))
 	  package.path   print preferred module install path
@@ -1329,18 +1331,28 @@ cppflags)
 	[ -z "${API_DIR:-}" ] || printf -- "-I${API_DIR}\n"
 
 	;;
+version)
+	findversion || exit 1
+
+	printf "$(((${API_VER} / 100) % 100)).$((($API_VER) % 100))\n"
+
+	;;
 ldflags)
 	findlib
 
 	[ "${LIBLUA_VER:-0}" -gt 0 ] || exit 1
 
-	printf -- "-L${LIBLUA_DIR} -l${LIBLUA_LIB}\n"
+	if [ "${#LIBLUA_DIR}" -gt 0 ]; then
+		printf -- "-L%s\n" "${LIBLUA_DIR}"
+	fi
 
 	;;
-version)
-	findversion || exit 1
+libs)
+	findlib
 
-	printf "$(((${API_VER} / 100) % 100)).$((($API_VER) % 100))\n"
+	[ "${LIBLUA_VER:-0}" -gt 0 ] || exit 1
+
+	printf -- "-l%s\n" "${LIBLUA_LIB}"
 
 	;;
 libv*)
