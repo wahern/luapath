@@ -437,7 +437,7 @@ findlua() {
 
 			debug "%s is version %s (%s API)" "${F}" "$(num2ver "${R}")" "$(num2api "${V}")"
 
-			# does it meet out API range criteria?
+			# does it meet our API range criteria?
 			[ ${V} -ge ${find_API_MIN} -a ${V} -le ${find_API_MAX} ] || continue
 
 			# does it meet our release range criteria?
