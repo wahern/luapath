@@ -88,9 +88,13 @@
 # * 2016-03-18 - Fix bug in tryluac where a continue statement was used
 # 	instead of return 0.
 #
+# * 2016-03-25 - Support ${CC} values with trailing flags, which invoke
+# 	the compiler through env(1), or which otherwise are intended to
+# 	expand as multiple words.
+#
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
-# Copyright (C) 2012-2015 William Ahern
+# Copyright (C) 2012-2016 William Ahern
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -122,7 +126,7 @@ unset IFS # no field splitting surprises
 unset LUA_PATH || true # interferes search for module install directory
 unset LUA_CPATH || true
 
-MYVERSION=20160318
+MYVERSION=20160325
 MYVENDOR="william@25thandClement.com"
 
 
@@ -167,6 +171,27 @@ LUAC_VER=
 
 LUA_PATH=
 LUA_VER=
+
+
+#
+# warn FORMAT [...]
+#
+# Print message to original stderr.
+#
+exec 9>&2
+warn() {
+	printf "%s: %.0s${1}\n" "${0##*/}" "$@" >&9
+}
+
+#
+# panic FORMAT [...]
+#
+# Print message to original stderr, then exit with failure.
+#
+panic() {
+	warn "$@"
+	exit 1
+}
 
 
 #
@@ -261,6 +286,21 @@ glob() {
 
 
 #
+# runcc [...]
+#
+# Wrapper for invoking ${CC}. Some build system include flags in ${CC},
+# invoke the compiler through env(1), or employ other hacks.
+#
+# TODO: Optionally handle unescaping of words in a manner similar to how
+# ${CC} would be evaluated from a make rule--typically by being passed
+# through system(3).
+#
+runcc() {
+	(unset IFS; exec ${CC} "$@")
+}
+
+
+#
 # evalmacro PATH MACRO [REGEX] [SUBST]
 #
 # 	PATH   Header identifier--#include <PATH>
@@ -270,7 +310,7 @@ glob() {
 #
 evalmacro() {
 	printf "#include <$1>\n[===[$2]===]\n" \
-	| "${CC:-cc}" ${CPPFLAGS:-} -E - 2>>/dev/null \
+	| runcc ${CPPFLAGS:-} -E - 2>>/dev/null \
 	| sed -ne "
 		s/^.*\\[===\\[ *\\(${3:-.*}\\) *\\]===\\].*$/${4:-\\1}/
 		t Found
@@ -924,7 +964,7 @@ isinteger() {
 checkints() {
 	while [ $# -gt 0 ]; do
 		if ! isinteger "${1}"; then
-			printf -- "${0##*/}: ${1}: not a number\n" >&2
+			warn "%s: not a number" "${1}"
 			return 1
 		fi
 
@@ -1085,7 +1125,7 @@ findlua() {
 
 
 ccname() {
-	"${CC}" -E - <<-EOF | awk '/sunpro/||/clang/||/gcc/||/other/{ print $1; exit; }'
+	runcc -E - <<-EOF | awk '/sunpro/||/clang/||/gcc/||/other/{ print $1; exit; }'
 		#if defined __SUNPRO_C
 		sunpro
 		#elif defined __clang__
@@ -1203,8 +1243,7 @@ while getopts I:L:P:d:De:krm:xsv:j:JVh OPT; do
 		;;
 	m)
 		if [ "${#OPTARG}" -eq 0 -o -n "${OPTARG##[0123456789]}" ]; then
-			printf -- "${0##*/}: ${OPTARG}: invalid maxdepth\n" >&2
-			exit 1
+			panic "%s: invalid maxdepth" "${OPTARG}"
 		fi
 
 		MAXDEPTH="${OPTARG}"
@@ -1230,8 +1269,7 @@ while getopts I:L:P:d:De:krm:xsv:j:JVh OPT; do
 		API_MAX="$(lua2num ${MAX:-99} 99)"
 
 		if [ "${API_MIN}" -gt "${API_MAX}" ]; then
-			printf -- "${0##*/}: ${OPTARG}: invalid version range\n" >&2
-			exit 1
+			panic "%s: invalid version range" "${OPTARG}"
 		fi
 
 		;;
@@ -1243,8 +1281,7 @@ while getopts I:L:P:d:De:krm:xsv:j:JVh OPT; do
 		JIT_MAX="$(jit2num ${MAX:-99} 99 99)"
 
 		if [ "${JIT_MIN}" -gt "${JIT_MAX}" ]; then
-			printf -- "${0##*/}: ${OPTARG}: invalid version range\n" >&2
-			exit 1
+			panic "%s: invalid version range" "${OPTARG}"
 		fi
 
 		JIT_REQ=yes
@@ -1273,10 +1310,13 @@ shift $(($OPTIND - 1))
 [ "${RECURSE}" = "yes" ] || MAXDEPTH=0
 
 
-for U in "${CC:-cc}" grep od rm rmdir sed xargs; do
-	if ! command -v "${U}" >>/dev/null 2>&1; then
-		printf -- "${0##*/}: ${U}: command not found\n" >&2
-	fi
+for U in "${CC}" grep od rm rmdir sed xargs; do
+	! command -v "${U}" >>/dev/null 2>&1 || continue
+
+	# ${CC} might have trailing flags or invoke the compiler through env
+	! command -v "${U%% *}" >>/dev/null 2>&1 || continue
+
+	warn "%s: command not found" "${U}"
 done
 
 
@@ -1284,15 +1324,13 @@ if [ -n "${SANDBOX}" ]; then
 	if [ "${SANDBOX}" = "${SANDBOX%/}" ]; then
 		if [ ! -c "${DEVRANDOM}" ]; then
 			# TODO: expand DEVRANDOM into set of different possibilities to check
-			printf -- "${0##*/}: ${DEVRANDDOM}: no character random device available\n" >&2
-			exit 1
+			panic "%s: no character random device available" "${DEVRANDOM}"
 		fi
 
 		TMP="${SANDBOX}$(od -An -N8 -tx1 < ${DEVRANDOM} 2>>/dev/null | tr -d ' 	')"
 
 		if [ ${#TMP} -ne $((${#SANDBOX} + 16)) ]; then
-			printf -- "${0##*/}: ${SANDBOX}: unable to generate random suffix\n" >&2
-			exit 1
+			panic "%s: unable to generate random suffix" "${SANDBOX}"
 		fi
 
 		SANDBOX="${TMP}"
@@ -1391,10 +1429,13 @@ lua)
 
 	;;
 ldir|cdir)
-	printf -- "${0##*/}: ${1}: deprecated command\n" >&2
 	MODE="${1}"
 	shift
 
+	# NOTE: Original implementation took arguments as lua interpreter
+	# glob patterns. The preferred method for that is now -e.
+	# package.path and package.cpath interpret arguments as preferred
+	# installation path candidates.
 	if [ $# -gt 0 ]; then
 		append GLOB $*
 	fi
@@ -1436,9 +1477,9 @@ testsym)
 	;;
 *)
 	if [ -n "${1:-}" ]; then
-		printf -- "${0##*/}: ${1}: unknown command\n" >&2
+		warn "%s: unknown command" "${1}"
 	else
-		printf -- "${0##*/}: no command specified\n" >&2
+		warn "no command specified"
 	fi
 
 	exit 1
