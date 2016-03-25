@@ -26,10 +26,10 @@
 # Changelog:
 #
 # * 2013-08-02 - Published. Derived from an earlier script, lua.path,
-#   written for the cqueues project.
+# 	written for the cqueues project.
 #
 # * 2013-08-05 - Redirect stdin from /dev/null when probing so we don't
-#   	freeze if a utility tries to read from stdin.
+# 	freeze if a utility tries to read from stdin.
 #
 # 	chdir to a read-only directory by default to try to prevent creation
 # 	of temporary files. These features address the issues of LuaTeX
@@ -91,6 +91,18 @@
 # * 2016-03-25 - Support ${CC} values with trailing flags, which invoke
 # 	the compiler through env(1), or which otherwise are intended to
 # 	expand as multiple words.
+#
+# 	OpenBSD 5.8 sh does not suppress strict errors within an eval
+# 	invoked from an if condition compound-list. Workaround by changing
+# 	trylua to return 0 on matching failure, like tryluainclude and
+# 	tryluac do.
+#
+# 	Undeprecate ldir and cdir. The names are more intuitive and
+# 	convenient as evidenced by the fact that I keep using them instead
+# 	of package.path and package.cpath. Try to maintain backwards
+# 	compatibility by using a simple heuristic to differentiate lua
+# 	interpreter glob patterns from preferred install directory
+# 	string.match expressions.
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
@@ -468,7 +480,9 @@ luapc() {
 findinstalldir() {
 	V_DIR=$((${LUA_VER} / 100 % 100)).$((${LUA_VER} % 100))
 
-	if [ "${1}" = "package.cpath" ]; then
+	if [ "${1}" = "package.cpath" -o "${1}" = "cdir" ]; then
+		ARRAY="package.cpath"
+
 		DIR="$(luapc --variable INSTALL_CMOD)"
 		[ -n "${DIR}" ] && set -- "$@" "${DIR}"
 
@@ -488,6 +502,8 @@ findinstalldir() {
 		set -- "$@" "${LUA_PATH}/../../lib/lua/${V_DIR}"
 		set -- "$@" "${LUA_PATH}/../../lib/*/lua/${V_DIR}" # e.g. lib/x86_64-linux-gnu
 	else
+		ARRAY="package.path"
+
 		DIR="$(luapc --variable INSTALL_LMOD)"
 		[ -n "${DIR}" ] && set -- "$@" "${DIR}"
 
@@ -499,7 +515,6 @@ findinstalldir() {
 		set -- "$@" "${LUA_PATH}/../../share/lua/${V_DIR}"
 	fi
 
-	ARRAY="${1}"
 	shift
 
 	if [ $# -eq 0 ]; then
@@ -1041,28 +1056,28 @@ mmp2num() {
 
 trylua() {
 	trylua_F="${1}"
-	[ -x "${trylua_F}" ] && safeperm "${trylua_F}" || return 1
+	[ -x "${trylua_F}" ] && safeperm "${trylua_F}" || return 0
 
 	trylua_V="$("${trylua_F}" -e 'print(string.match(_VERSION, [[[%d.]+]]))' </dev/null 2>>/dev/null | head -n1 | sed -ne 's/^\([0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
 	: ${trylua_V:=0}
 	trylua_V="$((${trylua_V%%.*} * 100 + ${trylua_V##*.} % 100))"
 
-	[ "${trylua_V}" -gt 0 -a "${trylua_V}" -ge "${LUA_VER:-0}" ] || return 1
+	[ "${trylua_V}" -gt 0 -a "${trylua_V}" -ge "${LUA_VER:-0}" ] || return 0
 
-	[ "${trylua_V}" -gt "${LUA_VER:-0}" -o "${#trylua_F}" -lt "${#LUA_PATH}" ] || return 1
+	[ "${trylua_V}" -gt "${LUA_VER:-0}" -o "${#trylua_F}" -lt "${#LUA_PATH}" ] || return 0
 
-	[ "${trylua_V}" -ge "${API_MIN}" -a "${trylua_V}" -le "${API_MAX}" ] || return 1
+	[ "${trylua_V}" -ge "${API_MIN}" -a "${trylua_V}" -le "${API_MAX}" ] || return 0
 
 	if [ -n "${JIT_REQ}" ]; then
 		J="$("${trylua_F}" -v </dev/null 2>&1 | head -n1 | sed -ne 's/^LuaJIT \([0123456789][0123456789]*\.[0123456789][0123456789]*\.[0123456789][0123456789]*\).*/\1/p')"
 		J="$(jit2num ${J:-0})"
 
 		if [ "${JIT_REQ}" = "skip" ]; then
-			[ "${J}" -eq 0 ] || return 1
+			[ "${J}" -eq 0 ] || return 0
 		elif [ "${JIT_REQ}" = "yes" ]; then
-			[ "${J}" -gt 0 ] || return 1
-			[ "${J}" -ge "${JIT_MIN}" ] || return 1
-			[ "${J}" -le "${JIT_MAX}" ] || return 1
+			[ "${J}" -gt 0 ] || return 0
+			[ "${J}" -ge "${JIT_MIN}" ] || return 0
+			[ "${J}" -le "${JIT_MAX}" ] || return 0
 		fi
 	fi
 
@@ -1429,24 +1444,38 @@ lua)
 
 	;;
 ldir|cdir)
-	MODE="${1}"
-	shift
+	#
+	# ldir and cdir were deprecated on 2014-12-18. On 2016-03-25 they
+	# were revived because their names are more intuitive than
+	# package.path and package.cpath. For now try to support the
+	# semantics of both by assuming interpreter glob patterns only match
+	# file names, while preferred install directory string.match
+	# expressions have directory components.
+	#
+	if true; then
+		MODE="${1}"
 
-	# NOTE: Original implementation took arguments as lua interpreter
-	# glob patterns. The preferred method for that is now -e.
-	# package.path and package.cpath interpret arguments as preferred
-	# installation path candidates.
-	if [ $# -gt 0 ]; then
-		append GLOB $*
+		# move command to end; rotates to ${1} after loop
+		set -- "$@" "${1}"
+		shift
+
+		cdir_I=0
+		cdir_N="$(($# - 1))"
+		while [ "${cdir_I}" -lt "${cdir_N}" ]; do
+			if [ "${1#*/}" = "${1}" ]; then
+				append GLOB "${1}"
+				warn "%s: passing glob patterns to %s is deprecated" "${1}" "${MODE}"
+			else
+				set -- "$@" "${1}"
+			fi
+			shift
+			cdir_I=$((${cdir_I} + 1))
+		done
 	fi
 
 	findlua || exit 1
 
-	if [ "${MODE}" = "cdir" ]; then
-		findinstalldir package.cpath
-	else
-		findinstalldir package.path
-	fi
+	findinstalldir "$@" || exit 1
 
 	;;
 package.path|package.cpath)
