@@ -128,9 +128,14 @@
 # 		EMPTY=
 # 		nargs ${UNSET-$EMPTY}
 #
+# * 2017-01-11 - Add -B option, which disables best match in favor of
+# 	first match.
+#
+# 	Try ${LUA} and ${LUAC} as candidates in findlua and findluac.
+#
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
-# Copyright (C) 2012-2016 William Ahern
+# Copyright (C) 2012-2017 William Ahern
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -162,7 +167,7 @@ unset IFS # no field splitting surprises
 unset LUA_PATH || true # interferes search for module install directory
 unset LUA_CPATH || true
 
-MYVERSION=20161010
+MYVERSION=20170111
 MYVENDOR="william@25thandClement.com"
 
 
@@ -180,6 +185,7 @@ MAXDEPTH=5  # maximum recursion depth
 SHORTEST=   # continue searching until shortest pathname found
 PKGCONFIG=  # path to pkg-config, found by `command -v` when -k option invoked
 GLOB=       # -e GLOB expression for lua, luac, ldir, and cdir
+BEST=yes    # continue searching until best (maximum version) match
 
 GLOB_LUA="lua:lua[5-9]*:lua-[5-9]*:luajit*"
 GLOB_LUAC="luac:luac[5-9]*:luac-[5-9]*"
@@ -209,6 +215,8 @@ LUAC_VER=
 LUA_PATH=
 LUA_VER=
 
+LUAJIT_PATH=
+LUAJIT_VER=
 
 #
 # warn FORMAT [...]
@@ -230,6 +238,47 @@ panic() {
 	exit 1
 }
 
+#
+# isnotnull VAR
+#
+isnotnull() {
+	eval isnotnull_V=\"\${${1}:+yes}\"
+	test "${isnotnull_V}" = "yes"
+}
+
+#
+# foundbest
+#
+# Auxiliary routine for foundversion, foundlua, etc.
+#
+foundbest() {
+	foundbest_VER="${1}"
+	foundbest_JITVER="${2}"
+
+	isnotnull foundbest_VER || return 1
+
+	[ "${foundbest_VER}" -ge "${API_MIN}" ] || return 1
+	[ "${foundbest_VER}" -le "${API_MAX}" ] || return 1
+
+	if [ "${JIT_REQ}" = "yes" ]; then
+		isnotnull foundbest_JITVER || return 1
+
+		[ "${foundbest_JITVER}" -ge "${JIT_MIN}" ] || return 1
+		[ "${foundbest_JITVER}" -le "${JIT_MAX}" ] || return 1
+	fi
+
+	if [ "${BEST}" = "yes" ]; then
+		[ "${foundbest_VER}" -eq "${API_MAX}" ] || return 1
+
+		if [ "${JIT_REQ}" = "yes" ]; then
+			[ "${foundbest_JITVER}" -eq "${JIT_MAX}" ] || return 1
+		fi
+
+		[ "${SHORTEST}" != "yes" ] || return 1
+	fi
+
+	return 0
+}
 
 #
 # parse CPPFLAGS -I or LDFLAGS -L directories
@@ -429,17 +478,7 @@ tryluainclude() {
 # true if found the best (maximum) possible version, false otherwise
 #
 foundversion() {
-	if [ "${API_VER:-0}" -lt "${API_MAX}" ]; then
-		return 1
-	fi
-
-	if [ "${JIT_REQ}" = "yes" -a "${JIT_VER:-0}" -lt "${JIT_MAX}" ]; then
-		return 1
-	fi
-
-	if [ "${SHORTEST}" = "yes" ]; then
-		return 1
-	fi
+	foundbest "${API_VER:-}" "${JIT_VER:-}" || return 1
 
 	return 0
 }
@@ -815,17 +854,7 @@ trylib() {
 # true if found the best (maximum) possible version, false otherwise
 #
 foundlib() {
-	if [ "${LIBLUA_VER:-0}" -lt "${API_MAX}" ]; then
-		return 1
-	fi
-
-	if [ "${JIT_REQ}" = "yes" -a "${LIBJIT_VER:-0}" -lt "${JIT_MAX}" ]; then
-		return 1
-	fi
-
-	if [ "${SHORTEST}" = "yes" ]; then
-		return 1
-	fi
+	foundbest "${LIBLUA_VER:-}" "${LIBJIT_VER:-}" || return 1
 
 	return 0
 }
@@ -936,13 +965,8 @@ tryluac() {
 # true if found the best (maximum) possible version, false otherwise
 #
 foundluac() {
-	if [ "${LUAC_VER:-0}" -lt "${API_MAX}" ]; then
-		return 1
-	fi
-
-	if [ "${SHORTEST}" = "yes" ]; then
-		return 1
-	fi
+	# NB: no LuaJIT-specific luac utility, so fake with ${JIT_MAX}
+	foundbest "${LUAC_VER:-}" "${JIT_MAX}" || return 1
 
 	return 0
 }
@@ -952,6 +976,18 @@ findluac() {
 		IFS=:
 		set -- ${GLOB:-${GLOB_LUAC}}
 		unset IFS
+	fi
+
+	if isnotnull LUAC; then
+		findluac_LUAC="$(command -v "${LUAC}" || true)"
+
+		if isnotnull findluac_LUAC; then
+			tryluac "${finaluac_LUAC}"
+
+			if foundluac; then
+				return 0
+			fi
+		fi
 	fi
 
 	for findluac_G; do
@@ -1103,6 +1139,9 @@ trylua() {
 			[ "${J}" -gt 0 ] || return 0
 			[ "${J}" -ge "${JIT_MIN}" ] || return 0
 			[ "${J}" -le "${JIT_MAX}" ] || return 0
+
+			LUAJIT_PATH="${trylua_F}"
+			LUAJIT_VER="${J}"
 		fi
 	fi
 
@@ -1116,13 +1155,7 @@ trylua() {
 # true if found the best (maximum) possible version, false otherwise
 #
 foundlua() {
-	if [ "${LUA_VER:-0}" -lt "${API_MAX}" ]; then
-		return 1
-	fi
-
-	if [ "${SHORTEST}" = "yes" ]; then
-		return 1
-	fi
+	foundbest "${LUA_VER:-}" "${LUAJIT_VER:-}" || return 1
 
 	return 0
 }
@@ -1132,6 +1165,18 @@ findlua() {
 		IFS=:
 		set -- ${GLOB:-${GLOB_LUA}}
 		unset IFS
+	fi
+
+	if isnotnull LUA; then
+		findlua_LUA="$(command -v "${LUA}" || true)"
+
+		if isnotnull findlua_LUA; then
+			trylua "${findlua_LUA}"
+
+			if foundlua; then
+				return 0
+			fi
+		fi
 	fi
 
 	for findlua_G; do
@@ -1185,6 +1230,8 @@ usage() {
 	  -I PATH      additional search directory for includes
 	  -L PATH      additional search directory for libraries
 	  -P PATH      additional search directory for binaries
+	  -b           find best match (maximum version) (default)
+	  -B           find first match
 	  -d PATH      use PATH as sandbox directory; a random 16 byte suffix is
 	               generated from /dev/urandom and the directory removed on exit
 	               unless a trailing "/" is present
@@ -1255,7 +1302,7 @@ version() {
 }
 
 
-while getopts I:L:P:d:De:krm:xsv:j:JVh OPT; do
+while getopts I:L:P:bBd:De:krm:xsv:j:JVh OPT; do
 	case "${OPT}" in
 	I)
 		INCDIRS="${INCDIRS:-}${INCDIRS:+:}${OPTARG}"
@@ -1265,6 +1312,12 @@ while getopts I:L:P:d:De:krm:xsv:j:JVh OPT; do
 		;;
 	P)
 		BINDIRS="${BINDIRS:-}${BINDIRS:+:}${OPTARG}"
+		;;
+	b)
+		BEST=yes
+		;;
+	B)
+		BEST=no
 		;;
 	d)
 		SANDBOX="${OPTARG}"
