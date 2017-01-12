@@ -982,7 +982,7 @@ findluac() {
 		findluac_LUAC="$(command -v "${LUAC}" || true)"
 
 		if isnotnull findluac_LUAC; then
-			tryluac "${finaluac_LUAC}"
+			tryluac "${findluac_LUAC}"
 
 			if foundluac; then
 				return 0
