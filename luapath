@@ -133,6 +133,11 @@
 #
 # 	Try ${LUA} and ${LUAC} as candidates in findlua and findluac.
 #
+# * 2017-01-13 - Add list command, which lists all matching candidates
+# 	encountered. Usage is
+#
+# 		list cppflags|version|lua|...|version-cppflags|...
+#
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 # Copyright (C) 2012-2017 William Ahern
@@ -167,7 +172,7 @@ unset IFS # no field splitting surprises
 unset LUA_PATH || true # interferes search for module install directory
 unset LUA_CPATH || true
 
-MYVERSION=20170111
+MYVERSION=20170113
 MYVENDOR="william@25thandClement.com"
 
 
@@ -218,6 +223,14 @@ LUA_VER=
 LUAJIT_PATH=
 LUAJIT_VER=
 
+ALL_STATE="\
+	API_VER API_DIR \
+	JIT_VER JIT_DIR \
+	LIBLUA_VER LIBLUA_DIR LIBLUA_LIB \
+	LIBJIT_VER LIBJIT_DIR LIBJIT_LIB \
+	LUAC_VER LUAC_PATH \
+	LUA_VER LUA_PATH"
+
 #
 # warn FORMAT [...]
 #
@@ -239,11 +252,207 @@ panic() {
 }
 
 #
-# isnotnull VAR
+# isnotnull NAME
+#
+# Returns true if NAME is set and not null, false otherwise.
 #
 isnotnull() {
-	eval isnotnull_V=\"\${${1}:+yes}\"
-	test "${isnotnull_V}" = "yes"
+	eval isnotnull_NAME=\"\${${1}:+yes}\"
+	test "${isnotnull_NAME}" = "yes"
+}
+
+#
+# isset NAME
+#
+# Returns true if NAME is set, false otherwise.
+#
+isset() {
+        eval isset_NAME=\"\${${1}+isset}\"
+        test "${isset_NAME}" = "isset"
+}
+
+#
+# copy SRCNAME DSTNAME
+#
+# Copy value of SRCNAME and to DSTNAME.
+#
+copy() {
+	if isset "${1}"; then
+		eval ${2}=\"\${${1}}\"
+	else
+		unset ${2}
+	fi
+}
+
+#
+# push NAME [VALUE]
+#
+# Save value of NAME and set to VALUE.
+#
+push() {
+	eval push_N=\"\${saved_N_${1}:-0}\"
+	push_N=$((${push_N} + 1))
+
+	if isset "${1}"; then
+		eval saved_${push_N}_${1}=\"\${${1}}\"
+	else
+		eval unset saved_${push_N}_${1}
+	fi
+
+	if [ $# -gt 1 ]; then
+		eval ${1}=\"${2}\"
+	else
+		unset ${1}
+	fi
+
+	eval saved_N_${1}=${push_N}
+}
+
+#
+# pop NAME
+#
+# Restore saved value of NAME.
+#
+pop() {
+	eval push_N=\"\${saved_N_${1}:-0}\"
+	[ ${push_N} -gt 0 ] || return 0
+
+	if isset "saved_${push_N}_${1}"; then
+		eval ${1}=\"\${saved_${push_N}_${1}}\"
+		unset saved_${push_N}_${1}
+	else
+		unset ${1}
+	fi
+
+	eval saved_N_${1}=$((${push_N} - 1))
+}
+
+#
+# popall NAME
+#
+# Pop all saved values
+#
+popall() {
+	while eval test \"\${saved_N_${1}:-0}\" -gt 0; do
+		pop "${1}"
+	done
+}
+
+#
+# pushstate
+#
+# Save state values and reset to null
+#
+pushstate() {
+	push IFS
+	[ $# -gt 0 ] || set -- "*"
+	for pushstate_GLOB; do
+		for pushstate_NAME in ${ALL_STATE}; do
+			if ismatch "${pushstate_NAME}" "${pushstate_GLOB}"; then
+				push "${pushstate_NAME}" ""
+			fi
+		done
+	done
+	pop IFS
+}
+
+#
+# popstate
+#
+# Restore state values
+#
+popstate() {
+	push IFS
+	[ $# -gt 0 ] || set -- "*"
+	for pushstate_GLOB; do
+		for pushstate_NAME in ${ALL_STATE}; do
+			if ismatch "${pushstate_NAME}" "${pushstate_GLOB}"; then
+				pop "${pushstate_NAME}"
+			fi
+		done
+	done
+	pop IFS
+}
+
+#
+# reset VAR ...
+#
+# Reset state variable(s) to null.
+#
+reset() {
+	push IFS
+	for reset_GLOB; do
+		for reset_NAME in ${ALL_STATE}; do
+			if ismatch "${reset_NAME}" "${reset_GLOB}"; then
+				eval "${reset_NAME}=\"\""
+			fi
+		done
+	done
+	pop IFS
+}
+
+#
+# ismatch STRING GLOB
+#
+# Returns true if string matches GLOB pattern, false otherwise.
+#
+ismatch() {
+	eval "case \"\${1}\" in ${2}) return 0 ;; esac"
+}
+
+#
+# onupdate NAME ACTION
+#
+# Invoke ACTION whenever variable NAME is updated.
+#
+onupdate() {
+	eval onupdate_ACTION_${1}=\"\${2}\"
+}
+
+push_onupdate() {
+	if [ $# -gt 1 ]; then
+		push "onupdate_ACTION_${1}" "${2}"
+	else
+		push "onupdate_ACTION_${1}"
+	fi
+}
+
+pop_onupdate() {
+	pop "onupdate_ACTION_${1}"
+}
+
+#
+# update NAME VALUE
+#
+# Set variable NAME to VALUE, invoking any update hooks.
+#
+update() {
+	# NB: required for AIX ksh88 so "$@" expands properly
+	push IFS
+
+	if isset "${1}"; then
+		eval update_OVAL=\"\${${1}}\"
+
+		# exit early if value is same
+		#
+		# NB: unless new value is empty, so we report empty cppflags
+		# and ldflags directories, which happens when is Lua found
+		# in default system paths
+		#
+		[ "${update_OVAL}" != "${2}" ] || [ -z "${2}" ] || return 0
+
+		# append any old value to argument list to be passed to hook
+		set -- "$@" "${update_OVAL}"
+	fi
+
+	eval ${1}=\"\${2}\"
+
+	if isnotnull "onupdate_ACTION_${1}"; then
+		eval onupdate_ACTION=\"\${onupdate_ACTION_${1}}\"
+		${onupdate_ACTION} "$@"
+	fi
+
+	pop IFS
 }
 
 #
@@ -350,9 +559,9 @@ append() {
 # glob PATTERN [MAXDEPTH] [EXEC-COMMAND] [INTERNAL:GLOB-COUNT]
 #
 glob() {
-	glob_N="${4:-0}"
+	push glob_N "${4:-0}"
 
-	IFS=
+	push IFS ""
 	set +f
 	for F in ${1}; do
 		[ -e "${F}" ] || continue
@@ -361,15 +570,16 @@ glob() {
 		fi
 	done
 	set -f
-	unset IFS
+	pop IFS
 
 	if [ "${2-0}" -gt 0 ]; then
 		glob "${1%/*}/*/${1##*/}" "$((${2} - 1))" "${3:-}" "${glob_N}" || :
 	fi
 
-	[ "${glob_N}" -gt 0 ]
+	[ "${glob_N}" -gt 0 ] && glob_RC=0 || glob_RC=1
+	pop glob_N
+	return ${glob_RC}
 } # glob
-
 
 #
 # runcc [...]
@@ -462,13 +672,13 @@ tryluainclude() {
 			[ "$J" -ge ${JIT_MIN} ] || return 0
 			[ "$J" -le "${JIT_MAX}" ] || return 0
 
-			JIT_VER="$J"
-			JIT_DIR="$D"
+			update JIT_VER "$J"
+			update JIT_DIR "$D"
 		fi
 	fi
 
-	API_VER="$V"
-	API_DIR="$D"
+	update API_VER "$V"
+	update API_DIR "$D"
 }
 
 
@@ -749,11 +959,10 @@ findversion() {
 		done
 	fi
 
-
-	# if we can find the lua interpreter, use it as a reference for
-	# header locations.
-	if findlua; then
-		D="${LUA_PATH%/*}"
+	# use every lua interpreter as a reference for header locations.
+	findversion_onlua() {
+		push D "${1}"
+		D="${D%/*}"
 		D="${D%/*}/include"
 
 		if [ -d "${D}" ]; then
@@ -763,7 +972,10 @@ findversion() {
 				return 0
 			fi
 		fi
-	fi
+
+		pop D
+	}
+	list findversion_onlua lua
 
 	[ "${API_VER:-0}" -gt 0 ]
 }
@@ -836,15 +1048,15 @@ trylib() {
 			[ "$J" -ge ${JIT_MIN} ] || return 1
 			[ "$J" -le "${JIT_MAX}" ] || return 1
 
-			LIBJIT_VER="$J"
-			LIBJIT_DIR="$D"
-			LIBJIT_LIB="$L"
+			update LIBJIT_VER "$J"
+			update LIBJIT_DIR "$D"
+			update LIBJIT_LIB "$L"
 		fi
 	fi
 
-	LIBLUA_VER="$V"
-	LIBLUA_DIR="$D"
-	LIBLUA_LIB="$L"
+	update LIBLUA_VER "$V"
+	update LIBLUA_DIR "$D"
+	update LIBLUA_LIB "$L"
 }
 
 
@@ -915,10 +1127,10 @@ findlib() {
 		fi
 	done
 
-	# if we can find the lua interpreter, use it as a reference for
-	# library locations.
-	if findlua; then
-		findlib_D="${LUA_PATH%/*}"
+	# use every lua interpreter as a reference for library locations.
+	findlib_onlua() {
+		push findlib_D "${1}"
+		findlib_D="${findlib_D%/*}"
 		findlib_D="${findlib_D%/*}/lib"
 
 		if [ -d "${findlib_D}" ]; then
@@ -928,7 +1140,10 @@ findlib() {
 				return 0
 			fi
 		fi
-	fi
+
+		pop findlib_D
+	}
+	list findlib_onlua lua
 }
 
 
@@ -955,8 +1170,8 @@ tryluac() {
 
 	printf "return true" 2>>/dev/null | ${tryluac_F} -p - </dev/null >>/dev/null 2>&1 || return 0
 
-	LUAC_PATH="${tryluac_F}"
-	LUAC_VER="${tryluac_V}"
+	update LUAC_VER "${tryluac_V}"
+	update LUAC_PATH "${tryluac_F}"
 }
 
 #
@@ -1140,13 +1355,13 @@ trylua() {
 			[ "${J}" -ge "${JIT_MIN}" ] || return 0
 			[ "${J}" -le "${JIT_MAX}" ] || return 0
 
-			LUAJIT_PATH="${trylua_F}"
-			LUAJIT_VER="${J}"
+			update LUAJIT_VER "${J}"
+			update LUAJIT_PATH "${trylua_F}"
 		fi
 	fi
 
-	LUA_PATH="${trylua_F}"
-	LUA_VER="${trylua_V}"
+	update LUA_VER "${trylua_V}"
+	update LUA_PATH "${trylua_F}"
 }
 
 #
@@ -1208,6 +1423,113 @@ findlua() {
 	[ "${LUA_VER:-0}" -gt 0 ] && [ "${#LUA_PATH}" -gt 0 ]
 }
 
+#
+# list ACTION WHAT
+#
+# List all discovered values for cppflags, version, etc that match the API
+# criteria, not just the best.
+#
+# NOTE: list is invoked reentrantly from findversion and findlib, which use
+# the list of interpreters (`list lua`) to derive candidate include/ and
+# lib/ directories.
+#
+list() {
+	push list_WHAT "${2:-}"
+	push list_ACTION_${list_WHAT} "${1}"
+	shift
+
+	case "${1:-}" in
+	cppflags)
+		onupdate API_DIR list_notify
+		findversion || true
+		;;
+	version)
+		onupdate API_VER list_notify
+		findversion || true
+		;;
+	ldflags)
+		onupdate LIBLUA_DIR list_notify
+		findlib || true
+		;;
+	libs)
+		onupdate LIBLUA_LIB list_notify
+		findlib || true
+		;;
+	lua)
+		onupdate LUA_PATH list_notify
+		findlua || true
+		;;
+	luac)
+		onupdate LUAC_PATH list_notify
+		findluac || true
+		;;
+	?*)
+		panic "unknown list type (%s)" "${1}"
+		;;
+	*)
+		panic "no list type specified"
+	esac
+
+	pop list_ACTION_${list_WHAT}
+	pop list_WHAT
+}
+
+list_notify() {
+	push list_ACTION
+
+	# discard old value if passed
+	[ $# -gt 2 ] && set -- "${1}" "${2}"
+
+	#
+	# NB: we reset the variables so the searcher doesn't short-circuit
+	# or skip lesser candidates; it forces the searcher to report all
+	# possible candidates regardless of the order in which they're
+	# encountered
+	#
+	case "${1}" in
+	API_DIR)
+		set -- "$@" "${API_VER}"
+		reset API_VER API_DIR JIT_VER JIT_DIR
+		copy list_ACTION_cppflags list_ACTION
+		;;
+	API_VER)
+		set -- "$@"
+		reset API_VER API_DIR JIT_VER JIT_DIR
+		copy list_ACTION_version list_ACTION
+		;;
+	LIBLUA_DIR)
+		set -- "$@" "${LIBLUA_VER}"
+		reset LIBLUA_VER LIBLUA_DIR LIBLUA_LIB
+		reset LIBJIT_VER LIBJIT_DIR LIBJIT_LIB
+		copy list_ACTION_ldflags list_ACTION
+		;;
+	LIBLUA_LIB)
+		set -- "$@" "${LIBLUA_VER}"
+		reset LIBLUA_VER LIBLUA_DIR LIBLUA_LIB
+		reset LIBJIT_VER LIBJIT_DIR LIBJIT_LIB
+		copy list_ACTION_libs list_ACTION
+		;;
+	LUA_PATH)
+		set -- "$@" "${LUA_VER}"
+		reset LUA_VER LUA_PATH LUAJIT_VER LUAJIT_PATH
+		copy list_ACTION_lua list_ACTION
+		;;
+	LUAC_PATH)
+		set -- "$@" "${LUAC_VER}"
+		reset LUAC_VER LUAC_PATH
+		copy list_ACTION_luac list_ACTION
+		;;
+	*)
+		panic "unknown variable (%s)" "${1}"
+		;;
+	esac
+
+	shift
+	isnotnull list_ACTION || panic "list ACTION is null"
+	${list_ACTION} "$@"
+
+	pop list_ACTION
+}
 
 ccname() {
 	runcc -E - <<-EOF | awk '/sunpro/||/clang/||/gcc/||/other/{ print $1; exit; }'
@@ -1259,6 +1581,7 @@ usage() {
 	  lua            print path to lua interpreter ($(printf "${GLOB_LUAC}" | tr ':' ' '))
 	  package.path   print preferred module install path
 	  package.cpath  print preferred C module install path
+	  list WHAT      print all discovered values of cppflags, version, etc
 	  ccname         print CC name (e.g. sunpro, clang, gcc)
 	  evalmacro      run internal macro evaluator for debugging
 	  testsym        run internal library symbol reader for debugging
@@ -1280,8 +1603,8 @@ usage() {
 	will match. To exclude LuaJIT entirely use the -J switch.
 
 	This utility processes the environment variables CC, CPPFLAGS,
-	LDFLAGS, and PATH if present. If recursion is requested, then
-	directories specified in CPPFLAGS, LDFLAGS, and PATH are also
+	LDFLAGS, LUA, LUAC, and PATH if present. If recursion is requested,
+	then directories specified in CPPFLAGS, LDFLAGS, and PATH are also
 	recursed.
 
 	If the environment variable CPPFLAGS is empty and no -I options are
@@ -1562,6 +1885,67 @@ package.path|package.cpath)
 	findinstalldir "$@" || exit 1
 
 	;;
+list|ls)
+	shift
+	list_WHAT=${1:-version}
+	[ $# -gt 0 ] && shift
+
+	list_num2ver() {
+		isinteger "${1:-}" || panic "not an integer (%s)" "${1:-?}"
+		list_V="$((${1} / 100 % 100)).$((${1} % 100))"
+		eval ${2}=\"\${list_V}\"
+	}
+
+	list_version() {
+		list_num2ver "${1}" list_V
+		printf "%s\n" "${list_V}"
+	}
+
+	# NB: list_S could be empty (e.g. no -I or -L flag necessary for
+	# visibility, but we still want to report that case
+	list_echo() {
+		list_S="${1}"
+		printf "%s%s\n" "${list_S:+${list_PREFIX:-}}" "${list_S}"
+	}
+
+	list_version_echo() {
+		list_S="${1}"
+		list_num2ver "${2}" list_V
+		printf "%s %s%s\n" "${list_V}" "${list_S:+${list_PREFIX:-}}" "${list_S}"
+	}
+
+	list_uniq() {
+		awk '{ if (!seen[$0]++) print }'
+	}
+
+	case "${list_WHAT}" in
+	cppflags|version-cppflags)
+		list_PREFIX="-I"
+		;;
+	ldflags|version-ldflags)
+		list_PREFIX="-L"
+		;;
+	libs|version-libs)
+		list_PREFIX="-l"
+		;;
+	esac
+
+	case "${list_WHAT}" in
+	version)
+		list list_version "${list_WHAT}" | list_uniq
+		;;
+	version-version)
+		list list_version "${list_WHAT#version-}" | list_uniq
+		;;
+	version-*)
+		list list_version_echo "${list_WHAT#version-}" | list_uniq
+		;;
+	*)
+		list list_echo "${list_WHAT}" | list_uniq
+		;;
+	esac
+
+	;;
 ccname)
 	ccname
 
@@ -1569,7 +1953,7 @@ ccname)
 evalmacro)
 	shift
 
-	evalmacro  $*
+	evalmacro $*
 	;;
 testsym)
 	shift
