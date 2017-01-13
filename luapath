@@ -986,10 +986,10 @@ findversion() {
 # compatible.
 #
 trylib() {
-	testsym "${1}" "lua_newstate" || return 1
+	testsym "${1}" "lua_newstate" || return 0
 
 	# exclude C++
-	[ "${1#*++}" = "${1}" ] || return 1
+	[ "${1#*++}" = "${1}" ] || return 0
 
 	V=0
 	J=0
@@ -1024,14 +1024,14 @@ trylib() {
 			V=503
 		fi
 	else
-		return 1
+		return 0
 	fi
 
-	[ "$V" -gt 0 -a "$V" -ge "${LIBLUA_VER:-0}" ] || return 1
+	[ "$V" -gt 0 -a "$V" -ge "${LIBLUA_VER:-0}" ] || return 0
 
-	[ "$V" -gt "${LIBLUA_VER:-0}" -o "${#D}" -lt "${#LIBLUA_DIR}" -o \( "${JIT_REQ}" = "yes" -a "${LIBJIT_VER:-0}" -lt "${JIT_MAX}" \) ] || return 1
+	[ "$V" -gt "${LIBLUA_VER:-0}" -o "${#D}" -lt "${#LIBLUA_DIR}" -o \( "${JIT_REQ}" = "yes" -a "${LIBJIT_VER:-0}" -lt "${JIT_MAX}" \) ] || return 0
 
-	[ "$V" -ge "${API_MIN}" -a "$V" -le "${API_MAX}" ] || return 1
+	[ "$V" -ge "${API_MIN}" -a "$V" -le "${API_MAX}" ] || return 0
 
 
 	if [ -n "${JIT_REQ}" ]; then
@@ -1041,12 +1041,12 @@ trylib() {
 		fi
 
 		if [ "${JIT_REQ}" = "skip" ]; then
-			[ "${J}" -eq 0 ] || return 1
+			[ "${J}" -eq 0 ] || return 0
 		elif [ "${JIT_REQ}" = "yes" ]; then
-			[ "$J" -ge "${LIBJIT_VER:-0}" ] || return 1
-			[ "$J" -gt "${LIBJIT_VER:-0}" -o "${#D}" -lt "${#LIBJIT_DIR}" ] || return 1
-			[ "$J" -ge ${JIT_MIN} ] || return 1
-			[ "$J" -le "${JIT_MAX}" ] || return 1
+			[ "$J" -ge "${LIBJIT_VER:-0}" ] || return 0
+			[ "$J" -gt "${LIBJIT_VER:-0}" -o "${#D}" -lt "${#LIBJIT_DIR}" ] || return 0
+			[ "$J" -ge ${JIT_MIN} ] || return 0
+			[ "$J" -le "${JIT_MAX}" ] || return 0
 
 			update LIBJIT_VER "$J"
 			update LIBJIT_DIR "$D"
