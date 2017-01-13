@@ -625,15 +625,20 @@ evalmacro() {
 # 0 (true) when found, non-0 (false) otherwise.
 #
 testsym() {
+	#
 	# NOTE: No -P for OpenBSD nm(1), but the default output format is
-	# close enough. Section types always have a leading and trailing
-	# space. U section type means undefined. On AIX [VWZ] are weak
-	# global symbols. Solaris and OS X have additional symbol types
-	# beyond the canonical POSIX/BSD types, all of which are uppercase
-	# and within [A-T].
-	(nm -Pg ${1} 2>>/dev/null || nm -g 2>>/dev/null) \
-	| sed -ne '/ [A-T] /p' \
-	| grep -q "${2}"
+	# close enough.
+	#
+	# On Debian -Pg fails if no debugging symbols, but -PD works
+	#
+	# Section types always have a leading and trailing space.  U section
+	# type means undefined.  On AIX [VWZ] are weak global symbols.
+	# Solaris and OS X have additional symbol types beyond the canonical
+	# POSIX/BSD types, all of which are uppercase and within [A-T].
+	#
+	(nm -Pg "${1}" 2>>/dev/null | sed -ne '/ [A-T] /p' | grep -q "${2}") || \
+	(nm -PD "${1}" 2>>/dev/null | sed -ne '/ [A-T] /p' | grep -q "${2}") || \
+	(nm -g "${1}" 2>>/dev/null | sed -ne '/ [A-T] /p' | grep -q "${2}")
 }
 
 
@@ -1009,6 +1014,9 @@ trylib() {
 	fi
 
 	L="${F#lib}"
+	while [ "${L%[.0123456789]}" != "${L}" ]; do
+		L="${L%[.0123456789]}"
+	done
 	L="${L%.so}"
 	L="${L%.a}"
 	L="${L%.dylib}"
