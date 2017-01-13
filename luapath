@@ -1236,16 +1236,16 @@ findluac() {
 
 
 isinteger() {
-	I="${1}"
+	isinteger_I="${1}"
 
-	[ "${#I}" -gt 0 ] || return 1
+	[ "${#isinteger_I}" -gt 0 ] || return 1
 
-	while [ "${#I}" -gt 0 ]; do
-		if [ "${I##[0123456789]}" = "${I}" ]; then
+	while [ "${#isinteger_I}" -gt 0 ]; do
+		if [ "${isinteger_I##[0123456789]}" = "${isinteger_I}" ]; then
 			return 1
 		fi
 
-		I=${I##[0123456789]}
+		isinteger_I=${isinteger_I##[0123456789]}
 	done
 
 	return 0
