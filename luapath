@@ -1037,7 +1037,7 @@ trylib() {
 
 	[ "$V" -gt 0 -a "$V" -ge "${LIBLUA_VER:-0}" ] || return 0
 
-	[ "$V" -gt "${LIBLUA_VER:-0}" -o "${#D}" -lt "${#LIBLUA_DIR}" -o \( "${JIT_REQ}" = "yes" -a "${LIBJIT_VER:-0}" -lt "${JIT_MAX}" \) ] || return 0
+	[ "$V" -gt "${LIBLUA_VER:-0}" -o "${#D}" -lt "${#LIBLUA_DIR}" -o \( "${#D}" -eq "${#LIBLUA_DIR}" -a "${#L}" -lt "${#LIBLUA_LIB}" \) -o \( "${JIT_REQ}" = "yes" -a "${LIBJIT_VER:-0}" -lt "${JIT_MAX}" \) ] || return 0
 
 	[ "$V" -ge "${API_MIN}" -a "$V" -le "${API_MAX}" ] || return 0
 
@@ -1052,7 +1052,7 @@ trylib() {
 			[ "${J}" -eq 0 ] || return 0
 		elif [ "${JIT_REQ}" = "yes" ]; then
 			[ "$J" -ge "${LIBJIT_VER:-0}" ] || return 0
-			[ "$J" -gt "${LIBJIT_VER:-0}" -o "${#D}" -lt "${#LIBJIT_DIR}" ] || return 0
+			[ "$J" -gt "${LIBJIT_VER:-0}" -o "${#D}" -lt "${#LIBJIT_DIR}" -o "${#L}" -lt "${#LIBJIT_LIB}" ] || return 0
 			[ "$J" -ge ${JIT_MIN} ] || return 0
 			[ "$J" -le "${JIT_MAX}" ] || return 0
 
