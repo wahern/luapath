@@ -138,9 +138,13 @@
 #
 # 		list cppflags|version|lua|...|version-cppflags|...
 #
+# * 2019-03-28 - HP-UX od(1) doesn't 0-pad the -tx output format. Fix sandbox
+# 	directory name random suffix generation by reading more bytes from
+# 	/dev/urandom than would otherwise be necessary and taking a prefix.
+#
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
-# Copyright (C) 2012-2017 William Ahern
+# Copyright (C) 2012-2017, 2019 William Ahern
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -1751,9 +1755,9 @@ if [ -n "${SANDBOX}" ]; then
 			panic "%s: no character random device available" "${DEVRANDOM}"
 		fi
 
-		TMP="${SANDBOX}$(od -An -N8 -tx1 < ${DEVRANDOM} 2>>/dev/null | tr -d ' 	')"
+		TMP="${SANDBOX}$(od -An -N32 -tx1 /dev/urandom | tr -cd '0123456789abcdef' | (cat; printf "\n") | sed -ne '1s/^\([0123456789abcdef]\{20\}\).*$/\1/p')"
 
-		if [ ${#TMP} -ne $((${#SANDBOX} + 16)) ]; then
+		if [ ${#TMP} -ne $((${#SANDBOX} + 20)) ]; then
 			panic "%s: unable to generate random suffix" "${SANDBOX}"
 		fi
 
